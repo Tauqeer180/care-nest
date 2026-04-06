@@ -1,3 +1,5 @@
+import { useEffect } from "react";
+import { Alert } from "react-native";
 import {
   DarkTheme,
   DefaultTheme,
@@ -9,6 +11,17 @@ import "react-native-reanimated";
 
 import { useColorScheme } from "@/hooks/use-color-scheme";
 import { ThemeProvider } from "@/hooks/useTheme";
+import {
+  registerFCMToken,
+  onTokenRefresh,
+  onForegroundMessage,
+  onNotificationOpenedApp,
+  getInitialNotification,
+  setBackgroundMessageHandler,
+} from "@/services/notificationService";
+
+// Register background handler — must be outside component
+setBackgroundMessageHandler();
 
 export const unstable_settings = {
   anchor: "(tabs)",
@@ -16,6 +29,40 @@ export const unstable_settings = {
 
 export default function RootLayout() {
   const colorScheme = useColorScheme();
+
+  useEffect(() => {
+    // Register FCM token
+    registerFCMToken();
+
+    // Listen for token refresh
+    const unsubTokenRefresh = onTokenRefresh();
+
+    // Handle foreground notifications — show an alert
+    const unsubForeground = onForegroundMessage((message) => {
+      Alert.alert(
+        message.notification?.title ?? "Notification",
+        message.notification?.body ?? ""
+      );
+    });
+
+    // Handle notification tap from background
+    const unsubOpenedApp = onNotificationOpenedApp((message) => {
+      console.log("Notification tapped (background):", message.data);
+    });
+
+    // Check if app was opened from a quit-state notification
+    getInitialNotification().then((message) => {
+      if (message) {
+        console.log("Notification tapped (quit state):", message.data);
+      }
+    });
+
+    return () => {
+      unsubTokenRefresh();
+      unsubForeground();
+      unsubOpenedApp();
+    };
+  }, []);
 
   return (
     <ThemeProvider>

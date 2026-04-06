@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "839290075302",
+    "project_id": "homecareplus-fa8ff",
+    "storage_bucket": "homecareplus-fa8ff.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:839290075302:android:274fd27fc715cd45979c67",
+        "android_client_info": {
+          "package_name": "com.tauqeer180.carenest"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyAqNG3mUNLRCDnKESXuCNO7zzM9I4yiFEM"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

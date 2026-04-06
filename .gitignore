@@ -3,7 +3,8 @@
 # dependencies
 node_modules/
 
-
+*.apk
+*.aab
 *.md
 # Expo
 .expo/
@@ -39,6 +40,10 @@ yarn-error.*
 *.tsbuildinfo
 
 app-example
+
+# Firebase
+# google-services.json
+# GoogleService-Info.plist
 
 # generated native folders
 /ios
