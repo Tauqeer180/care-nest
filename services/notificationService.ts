@@ -38,7 +38,7 @@ export async function registerFCMToken(): Promise<string | null> {
 
     const token = await messaging().getToken();
     console.log("FCM Token:", token);
-
+    
     // Check if token changed since last registration
     const storedToken = await AsyncStorage.getItem(FCM_TOKEN_KEY);
     if (storedToken !== token) {
