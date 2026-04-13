@@ -1,5 +1,4 @@
 import { useEffect } from "react";
-import { Alert } from "react-native";
 import {
   DarkTheme,
   DefaultTheme,
@@ -19,6 +18,9 @@ import {
   getInitialNotification,
   setBackgroundMessageHandler,
 } from "@/services/notificationService";
+import NotificationBanner, {
+  showInAppNotification,
+} from "@/components/NotificationBanner";
 
 // Register background handler — must be outside component
 setBackgroundMessageHandler();
@@ -37,12 +39,9 @@ export default function RootLayout() {
     // Listen for token refresh
     const unsubTokenRefresh = onTokenRefresh();
 
-    // Handle foreground notifications — show an alert
+    // Handle foreground notifications — show in-app banner
     const unsubForeground = onForegroundMessage((message) => {
-      Alert.alert(
-        message.notification?.title ?? "Notification",
-        message.notification?.body ?? ""
-      );
+      showInAppNotification(message);
     });
 
     // Handle notification tap from background
@@ -116,6 +115,7 @@ export default function RootLayout() {
           />
         </Stack>
         <StatusBar style="auto" />
+        <NotificationBanner />
       </NavigationThemeProvider>
     </ThemeProvider>
   );

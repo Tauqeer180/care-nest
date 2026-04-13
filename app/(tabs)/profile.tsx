@@ -1,5 +1,5 @@
 import { useTheme } from "@/hooks/useTheme";
-import { getStoredCompanyInfo, clearAuthData, CompanyInfo } from "@/services/api";
+import { getStoredCompanyInfo, getStoredUser, clearAuthData, CompanyInfo, AuthUser } from "@/services/api";
 import { MaterialIcons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
 import React, { useEffect, useState } from "react";
@@ -25,10 +25,18 @@ export default function ProfileScreen() {
   const { colors } = useTheme();
   const router = useRouter();
   const [companyInfo, setCompanyInfo] = useState<CompanyInfo | null>(null);
+  const [user, setUser] = useState<AuthUser | null>(null);
 
   useEffect(() => {
     getStoredCompanyInfo().then(setCompanyInfo);
+    getStoredUser().then(setUser);
   }, []);
+
+  const fullName = user ? `${user.firstName} ${user.lastName}` : "";
+  const initials = user
+    ? `${user.firstName.charAt(0)}${user.lastName.charAt(0)}`.toUpperCase()
+    : "";
+  const roleLabel = user?.userType === "superadmin" ? "Admin" : "Employee";
 
   const handleLogout = () => {
     Alert.alert("Logout", "Are you sure you want to logout?", [
@@ -165,6 +173,12 @@ export default function ProfileScreen() {
       fontSize: 13,
       color: "rgba(255,255,255,0.8)",
       fontWeight: "500",
+      marginBottom: 4,
+    },
+    profileEmail: {
+      fontSize: 12,
+      color: "rgba(255,255,255,0.65)",
+      fontWeight: "400",
       marginBottom: 12,
     },
     companyChip: {
@@ -314,10 +328,13 @@ export default function ProfileScreen() {
         </View>
         <View style={styles.profileSection}>
           <View style={styles.avatarContainer}>
-            <Text style={styles.avatarText}>TA</Text>
+            <Text style={styles.avatarText}>{initials || "?"}</Text>
           </View>
-          <Text style={styles.profileName}>Tauqeer Abbas</Text>
-          <Text style={styles.profileRole}>Employee</Text>
+          <Text style={styles.profileName}>{fullName || "Loading..."}</Text>
+          <Text style={styles.profileRole}>{roleLabel}</Text>
+          {user?.email && (
+            <Text style={styles.profileEmail}>{user.email}</Text>
+          )}
           {companyInfo && (
             <View style={styles.companyChip}>
               <MaterialIcons name="business" size={14} color="rgba(255,255,255,0.9)" />

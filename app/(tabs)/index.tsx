@@ -12,14 +12,41 @@ import {
 import { useRouter } from "expo-router";
 import { MaterialIcons, Feather } from "@expo/vector-icons";
 import { fetchMyJobs, Job } from "@/services/jobPoolService";
+import { getStoredUser, AuthUser } from "@/services/api";
+import { getAttendanceStatus, checkIn, checkOut } from "@/services/attendanceService";
 
 export default function HomeScreen() {
   const { colors } = useTheme();
   const router = useRouter();
   const [myJobs, setMyJobs] = useState<Job[]>([]);
   const [myJobsLoading, setMyJobsLoading] = useState(true);
+  const [user, setUser] = useState<AuthUser | null>(null);
+  const [isCheckedIn, setIsCheckedIn] = useState(false);
+  const [checkInTime, setCheckInTime] = useState<string | null>(null);
+  const [checkOutTime, setCheckOutTime] = useState<string | null>(null);
+  const [todayTotal, setTodayTotal] = useState("00:00");
+  const [checkingIn, setCheckingIn] = useState(false);
+  const [elapsed, setElapsed] = useState("00 : 00 : 00");
+
+  const loadAttendance = () => {
+    getAttendanceStatus()
+      .then((data) => {
+        setIsCheckedIn(data.isCheckedIn);
+        setTodayTotal(data.today.totalFormatted);
+        if (data.activeCheckIn) {
+          setCheckInTime(data.activeCheckIn.checkInTime);
+          setCheckOutTime(data.activeCheckIn.checkOutTime);
+        } else {
+          setCheckInTime(null);
+          setCheckOutTime(null);
+        }
+      })
+      .catch((err) => console.error("Attendance status error:", err.message));
+  };
 
   useEffect(() => {
+    getStoredUser().then(setUser);
+    loadAttendance();
     fetchMyJobs(1, 5)
       .then((response) => {
         console.log("My Jobs API Response:", JSON.stringify(response, null, 2));
@@ -30,6 +57,40 @@ export default function HomeScreen() {
       })
       .finally(() => setMyJobsLoading(false));
   }, []);
+
+  // Live elapsed timer when checked in
+  useEffect(() => {
+    if (!isCheckedIn || !checkInTime) {
+      setElapsed("00 : 00 : 00");
+      return;
+    }
+    const tick = () => {
+      const diff = Math.floor((Date.now() - new Date(checkInTime).getTime()) / 1000);
+      const h = String(Math.floor(diff / 3600)).padStart(2, "0");
+      const m = String(Math.floor((diff % 3600) / 60)).padStart(2, "0");
+      const s = String(diff % 60).padStart(2, "0");
+      setElapsed(`${h} : ${m} : ${s}`);
+    };
+    tick();
+    const interval = setInterval(tick, 1000);
+    return () => clearInterval(interval);
+  }, [isCheckedIn, checkInTime]);
+
+  const handleCheckInOut = async () => {
+    setCheckingIn(true);
+    try {
+      if (isCheckedIn) {
+        await checkOut();
+      } else {
+        await checkIn();
+      }
+      loadAttendance();
+    } catch (err: any) {
+      console.error("Check in/out error:", err.message);
+    } finally {
+      setCheckingIn(false);
+    }
+  };
 
   const formatDate = (dateStr: string) => {
     const date = new Date(dateStr);
@@ -59,12 +120,14 @@ export default function HomeScreen() {
         <View style={styles.welcomeRow}>
           <View>
             <Text style={styles.welcome}>Welcome,</Text>
-            <Text style={styles.welcome}>Tauqeer Abbas</Text>
+            <Text style={styles.welcome}>
+              {user ? `${user.firstName} ${user.lastName}` : ""}
+            </Text>
           </View>
 
-          <View style={styles.profileIcon}>
+          <TouchableOpacity style={styles.profileIcon} onPress={() => router.push("/(tabs)/profile")}>
             <IconSymbol name="person" size={20} color="white" />
-          </View>
+          </TouchableOpacity>
         </View>
       </View>
 
@@ -74,16 +137,27 @@ export default function HomeScreen() {
           style={[styles.card, { backgroundColor: colors.card.background }]}
         >
           <Text style={[styles.cardLabel, { color: colors.textSecondary }]}>
-            OVERALL TIME
+            {isCheckedIn ? "ELAPSED TIME" : "OVERALL TIME"}
           </Text>
           <View style={styles.timeRow}>
             <Text style={[styles.time, { color: colors.textPrimary }]}>
-              09 : 50 : 22 AM
+              {isCheckedIn ? elapsed : todayTotal}
             </Text>
             <TouchableOpacity
-              style={[styles.checkInBtn, { backgroundColor: colors.primary }]}
+              style={[
+                styles.checkInBtn,
+                { backgroundColor: isCheckedIn ? colors.error : colors.primary },
+              ]}
+              onPress={handleCheckInOut}
+              disabled={checkingIn}
             >
-              <Text style={styles.checkInText}>Check In</Text>
+              {checkingIn ? (
+                <ActivityIndicator size="small" color="white" />
+              ) : (
+                <Text style={styles.checkInText}>
+                  {isCheckedIn ? "Check Out" : "Check In"}
+                </Text>
+              )}
             </TouchableOpacity>
           </View>
 
@@ -96,9 +170,20 @@ export default function HomeScreen() {
                 color={colors.primary}
               />
               <Text
+                style={[styles.timeStatLabel, { color: colors.textTertiary }]}
+              >
+                Check In
+              </Text>
+              <Text
                 style={[styles.timeStatValue, { color: colors.textPrimary }]}
               >
-                10:00 AM
+                {checkInTime
+                  ? new Date(checkInTime).toLocaleTimeString("en-US", {
+                      hour: "2-digit",
+                      minute: "2-digit",
+                      hour12: true,
+                    })
+                  : "--:--"}
               </Text>
             </View>
             <View style={styles.timeStat}>
@@ -108,24 +193,40 @@ export default function HomeScreen() {
                 color={colors.primary}
               />
               <Text
+                style={[styles.timeStatLabel, { color: colors.textTertiary }]}
+              >
+                Check Out
+              </Text>
+              <Text
                 style={[styles.timeStatValue, { color: colors.textPrimary }]}
               >
-                06:30 PM
+                {checkOutTime
+                  ? new Date(checkOutTime).toLocaleTimeString("en-US", {
+                      hour: "2-digit",
+                      minute: "2-digit",
+                      hour12: true,
+                    })
+                  : "--:--"}
               </Text>
             </View>
             <View style={styles.timeStat}>
               <IconSymbol name="clock.fill" size={24} color={colors.primary} />
               <Text
+                style={[styles.timeStatLabel, { color: colors.textTertiary }]}
+              >
+                Today
+              </Text>
+              <Text
                 style={[styles.timeStatValue, { color: colors.textPrimary }]}
               >
-                00:00:00
+                {todayTotal}
               </Text>
             </View>
           </View>
         </View>
 
         {/* Attendance Summary */}
-        <View
+        {/* <View
           style={[styles.card, { backgroundColor: colors.card.background }]}
         >
           <View style={styles.cardHeader}>
@@ -163,7 +264,7 @@ export default function HomeScreen() {
               </Text>
             </View>
           </View>
-        </View>
+        </View> */}
 
         {/* My Applied Jobs */}
         <View style={[styles.card, { backgroundColor: colors.card.background }]}>
@@ -328,9 +429,13 @@ const styles = StyleSheet.create({
     alignItems: "center",
     gap: 8,
   },
+  timeStatLabel: {
+    fontSize: 11,
+    fontWeight: "500",
+  },
   timeStatValue: {
     fontSize: 12,
-    fontWeight: "500",
+    fontWeight: "600",
   },
   cardHeader: {
     flexDirection: "row",
