@@ -1,15 +1,24 @@
 {
   "expo": {
-    "name": "care-nest",
+    "name": "Home Care Plus",
     "slug": "care-nest",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
-    "scheme": "carenest",
+    "scheme": "home-care-plus",
     "userInterfaceStyle": "automatic",
     "newArchEnabled": true,
     "ios": {
-      "supportsTablet": true
+      "supportsTablet": true,
+      "bundleIdentifier": "com.tauqeer180.carenest",
+      "googleServicesFile": "./GoogleService-Info.plist",
+      "entitlements": {
+        "aps-environment": "production" /*development || production*/
+      },
+      "infoPlist": {
+        "ITSAppUsesNonExemptEncryption": false,
+        "UIBackgroundModes": ["remote-notification"]
+      }
     },
     "android": {
       "googleServicesFile": "./google-services.json",
@@ -31,6 +40,8 @@
       "expo-router",
       "@react-native-firebase/app",
       "@react-native-firebase/messaging",
+      "./plugins/withFirebaseiOSFix",
+      "./plugins/withAdiRegistration",
       [
         "expo-splash-screen",
         {
