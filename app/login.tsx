@@ -1,4 +1,5 @@
 import { useTheme } from "@/hooks/useTheme";
+import { useAuth } from "@/hooks/useAuth";
 import { CompanyInfo, getStoredCompanyInfo } from "@/services/api";
 import {
   login,
@@ -27,6 +28,7 @@ type Step = "company" | "credentials" | "otp";
 export default function LoginScreen() {
   const { colors } = useTheme();
   const router = useRouter();
+  const { setAuthed } = useAuth();
 
   const [step, setStep] = useState<Step>("company");
   const [companyCode, setCompanyCode] = useState("");
@@ -120,6 +122,7 @@ export default function LoginScreen() {
       setStep("otp");
     } catch (error: unknown) {
       const message = error instanceof Error ? error.message : "Login failed";
+     console.log("Login error => ", error);
       setPasswordError(message);
     } finally {
       setLoading(false);
@@ -141,7 +144,8 @@ export default function LoginScreen() {
     setLoading(true);
     try {
       await verifyOtp(loginUserId, otp, userType);
-      router.replace("/(tabs)");
+      setAuthed(true);
+      // Route protection will auto-redirect to /(tabs)
     } catch (error: unknown) {
       const message =
         error instanceof Error ? error.message : "OTP verification failed";

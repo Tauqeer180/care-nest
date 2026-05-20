@@ -1,50 +1,50 @@
-import { useEffect, useState, useCallback } from 'react';
+import { useState, useCallback } from 'react';
 import { StyleSheet, FlatList, View, Text, TouchableOpacity, ActivityIndicator, RefreshControl } from 'react-native';
-import { useRouter } from 'expo-router';
+import { useRouter, useFocusEffect } from 'expo-router';
 import { useTheme } from '@/hooks/useTheme';
 import { Feather, MaterialIcons } from '@expo/vector-icons';
-import { fetchJobPoolListings, Job } from '@/services/jobPoolService';
+import useSWRInfinite from 'swr/infinite';
+import { fetchJobPoolListings } from '@/services/jobPoolService';
+
+const PAGE_SIZE = 20;
 
 export default function JobPoolScreen() {
   const { colors } = useTheme();
   const router = useRouter();
-  const [jobs, setJobs] = useState<Job[]>([]);
-  const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
-  const [loadingMore, setLoadingMore] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [page, setPage] = useState(1);
-  const [hasMore, setHasMore] = useState(true);
 
-  const loadJobs = useCallback(async (pageNum: number, refresh = false) => {
-    try {
-      const response = await fetchJobPoolListings(pageNum);
-      const { jobs: newJobs, pagination } = response.data;
-      setJobs((prev) => (refresh ? newJobs : [...prev, ...newJobs]));
-      setHasMore(pagination.hasMore);
-      setPage(pageNum);
-      setError(null);
-    } catch (err: any) {
-      setError(err.message ?? 'Failed to load jobs');
-    }
-  }, []);
+  const { data, error, size, setSize, isLoading, isValidating, mutate } = useSWRInfinite(
+    (index, prev) => {
+      if (prev && !prev.data.pagination.hasMore) return null;
+      return ['job-pool', index + 1, PAGE_SIZE] as const;
+    },
+    ([, page, limit]) => fetchJobPoolListings(page, limit),
+    { revalidateOnFocus: true, revalidateFirstPage: false }
+  );
 
-  useEffect(() => {
-    loadJobs(1, true).finally(() => setLoading(false));
-  }, [loadJobs]);
+  const jobs = data ? data.flatMap((page) => page.data.jobs) : [];
+  const lastPage = data ? data[data.length - 1] : null;
+  const hasMore = lastPage?.data.pagination.hasMore ?? true;
+  const loadingMore = isValidating && size > 1 && data && size > data.length;
+
+  console.log("Jobs Listing ", jobs)
+  // Revalidate when screen regains focus (e.g. after applying for a job)
+  useFocusEffect(
+    useCallback(() => {
+      mutate();
+    }, [mutate])
+  );
 
   const handleRefresh = useCallback(async () => {
     setRefreshing(true);
-    await loadJobs(1, true);
+    await mutate();
     setRefreshing(false);
-  }, [loadJobs]);
+  }, [mutate]);
 
-  const handleLoadMore = useCallback(async () => {
+  const handleLoadMore = useCallback(() => {
     if (loadingMore || !hasMore) return;
-    setLoadingMore(true);
-    await loadJobs(page + 1);
-    setLoadingMore(false);
-  }, [loadingMore, hasMore, page, loadJobs]);
+    setSize(size + 1);
+  }, [loadingMore, hasMore, size, setSize]);
 
   const formatDate = (dateStr: string) => {
     const date = new Date(dateStr);
@@ -68,14 +68,14 @@ export default function JobPoolScreen() {
       </View>
 
       {/* Content */}
-      {loading ? (
+      {isLoading && jobs.length === 0 ? (
         <View style={styles.centered}>
           <ActivityIndicator size="large" color={colors.primary} />
         </View>
-      ) : error ? (
+      ) : error && jobs.length === 0 ? (
         <View style={styles.centered}>
           <MaterialIcons name="error-outline" size={48} color={colors.error} />
-          <Text style={[styles.errorText, { color: colors.textSecondary }]}>{error}</Text>
+          <Text style={[styles.errorText, { color: colors.textSecondary }]}>{error.message ?? 'Failed to load jobs'}</Text>
         </View>
       ) : jobs.length === 0 ? (
         <View style={styles.centered}>
@@ -108,7 +108,7 @@ export default function JobPoolScreen() {
                   </Text>
                 </View>
                 <View style={[styles.payBadge, { backgroundColor: colors.success + '15' }]}>
-                  <Text style={[styles.payText, { color: colors.success }]}>${job.pay_rate}/hr</Text>
+                  <Text style={[styles.payText, { color: colors.success }]}>${job.pay_rate ?? 0}/hr</Text>
                 </View>
               </View>
 

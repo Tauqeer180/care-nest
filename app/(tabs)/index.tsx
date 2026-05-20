@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { IconSymbol } from "@/components/ui/icon-symbol";
 import { useTheme } from "@/hooks/useTheme";
 import {
@@ -9,54 +9,55 @@ import {
   TouchableOpacity,
   View,
 } from "react-native";
-import { useRouter } from "expo-router";
+import { useRouter, useFocusEffect } from "expo-router";
 import { MaterialIcons, Feather } from "@expo/vector-icons";
-import { fetchMyJobs, Job } from "@/services/jobPoolService";
+import useSWR, { mutate } from "swr";
+import { fetchMyJobs } from "@/services/jobPoolService";
 import { getStoredUser, AuthUser } from "@/services/api";
 import { getAttendanceStatus, checkIn, checkOut } from "@/services/attendanceService";
+import { SWR_KEYS } from "@/services/swrKeys";
 
 export default function HomeScreen() {
   const { colors } = useTheme();
   const router = useRouter();
-  const [myJobs, setMyJobs] = useState<Job[]>([]);
-  const [myJobsLoading, setMyJobsLoading] = useState(true);
   const [user, setUser] = useState<AuthUser | null>(null);
-  const [isCheckedIn, setIsCheckedIn] = useState(false);
-  const [checkInTime, setCheckInTime] = useState<string | null>(null);
-  const [checkOutTime, setCheckOutTime] = useState<string | null>(null);
-  const [todayTotal, setTodayTotal] = useState("00:00");
   const [checkingIn, setCheckingIn] = useState(false);
   const [elapsed, setElapsed] = useState("00 : 00 : 00");
 
-  const loadAttendance = () => {
-    getAttendanceStatus()
-      .then((data) => {
-        setIsCheckedIn(data.isCheckedIn);
-        setTodayTotal(data.today.totalFormatted);
-        if (data.activeCheckIn) {
-          setCheckInTime(data.activeCheckIn.checkInTime);
-          setCheckOutTime(data.activeCheckIn.checkOutTime);
-        } else {
-          setCheckInTime(null);
-          setCheckOutTime(null);
-        }
-      })
-      .catch((err) => console.error("Attendance status error:", err.message));
-  };
+  const isAdmin = user?.userType === "superadmin";
 
   useEffect(() => {
     getStoredUser().then(setUser);
-    loadAttendance();
-    fetchMyJobs(1, 5)
-      .then((response) => {
-        console.log("My Jobs API Response:", JSON.stringify(response, null, 2));
-        setMyJobs(response.data.jobs);
-      })
-      .catch((err) => {
-        console.error("My Jobs API Error:", err.message);
-      })
-      .finally(() => setMyJobsLoading(false));
   }, []);
+
+  // SWR: My Applied Jobs (employee only)
+  const { data: myJobsData, isLoading: myJobsLoading, mutate: mutateMyJobs } = useSWR(
+    !isAdmin && user ? SWR_KEYS.myJobs(1, 5) : null,
+    () => fetchMyJobs(1, 5),
+    { revalidateOnFocus: true }
+  );
+  const myJobs = myJobsData?.data.jobs ?? [];
+
+  // SWR: Attendance status (employee only)
+  const { data: attendance, mutate: mutateAttendance } = useSWR(
+    !isAdmin && user ? SWR_KEYS.attendanceStatus() : null,
+    getAttendanceStatus,
+    { revalidateOnFocus: true }
+  );
+
+  // Revalidate when tab regains focus
+  useFocusEffect(
+    useCallback(() => {
+      if (!isAdmin) {
+        mutateMyJobs();
+        mutateAttendance();
+      }
+    }, [isAdmin, mutateMyJobs, mutateAttendance])
+  );
+  const isCheckedIn = attendance?.isCheckedIn ?? false;
+  const checkInTime = attendance?.activeCheckIn?.checkInTime ?? null;
+  const checkOutTime = attendance?.activeCheckIn?.checkOutTime ?? null;
+  const todayTotal = attendance?.today.totalFormatted ?? "00:00";
 
   // Live elapsed timer when checked in
   useEffect(() => {
@@ -84,7 +85,7 @@ export default function HomeScreen() {
       } else {
         await checkIn();
       }
-      loadAttendance();
+      mutate(SWR_KEYS.attendanceStatus());
     } catch (err: any) {
       console.error("Check in/out error:", err.message);
     } finally {
@@ -131,8 +132,9 @@ export default function HomeScreen() {
         </View>
       </View>
 
-      {/* Check In Section */}
+      {/* Check In Section — Employees only */}
       <View style={styles.content}>
+        {!isAdmin && (
         <View
           style={[styles.card, { backgroundColor: colors.card.background }]}
         >
@@ -224,6 +226,7 @@ export default function HomeScreen() {
             </View>
           </View>
         </View>
+        )}
 
         {/* Attendance Summary */}
         {/* <View
@@ -266,7 +269,8 @@ export default function HomeScreen() {
           </View>
         </View> */}
 
-        {/* My Applied Jobs */}
+        {/* My Applied Jobs — Employees only */}
+        {!isAdmin && (
         <View style={[styles.card, { backgroundColor: colors.card.background }]}>
           <View style={styles.cardHeader}>
             <Text style={[styles.cardTitle, { color: colors.textPrimary }]}>
@@ -307,13 +311,14 @@ export default function HomeScreen() {
                   </View>
                 </View>
                 <View style={styles.myJobRight}>
-                  <Text style={[styles.myJobPay, { color: colors.success }]}>${job.pay_rate}/hr</Text>
+                  <Text style={[styles.myJobPay, { color: colors.success }]}>${job.pay_rate ?? 0}/hr</Text>
                   <MaterialIcons name="chevron-right" size={20} color={colors.textTertiary} />
                 </View>
               </TouchableOpacity>
             ))
           )}
         </View>
+        )}
       </View>
     </ScrollView>
   );

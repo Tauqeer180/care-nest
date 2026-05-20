@@ -1,5 +1,7 @@
 import { useTheme } from "@/hooks/useTheme";
-import { getStoredCompanyInfo, getStoredUser, clearAuthData, CompanyInfo, AuthUser } from "@/services/api";
+import { getStoredCompanyInfo, getStoredUser, CompanyInfo, AuthUser } from "@/services/api";
+import { useSWRConfig } from "swr";
+import { useAuth } from "@/hooks/useAuth";
 import { MaterialIcons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
 import React, { useEffect, useState } from "react";
@@ -26,6 +28,8 @@ export default function ProfileScreen() {
   const router = useRouter();
   const [companyInfo, setCompanyInfo] = useState<CompanyInfo | null>(null);
   const [user, setUser] = useState<AuthUser | null>(null);
+  const { cache } = useSWRConfig();
+  const { signOut } = useAuth();
 
   useEffect(() => {
     getStoredCompanyInfo().then(setCompanyInfo);
@@ -45,12 +49,16 @@ export default function ProfileScreen() {
         text: "Logout",
         style: "destructive",
         onPress: async () => {
-          await clearAuthData();
-          router.replace("/login");
+          // Clear SWR cache so next user's data doesn't leak
+          for (const key of cache.keys()) cache.delete(key);
+          await signOut();
+          // Route protection will auto-redirect to /login
         },
       },
     ]);
   };
+
+  const isAdmin = user?.userType === "superadmin";
 
   const menuSections: { title: string; items: MenuItem[] }[] = [
     {
@@ -68,37 +76,35 @@ export default function ProfileScreen() {
           subtitle: "Update your password",
           showChevron: true,
         },
-        {
-          icon: "notifications-none",
-          label: "Notifications",
-          subtitle: "Push, email preferences",
-          showChevron: true,
-        },
       ],
     },
-    {
-      title: "Work",
-      items: [
-        {
-          icon: "access-time",
-          label: "Attendance History",
-          subtitle: "View past attendance records",
-          showChevron: true,
-        },
-        {
-          icon: "event-note",
-          label: "Leave Requests",
-          subtitle: "Apply & track leaves",
-          showChevron: true,
-        },
-        {
-          icon: "description",
-          label: "Documents",
-          subtitle: "Payslips, letters, certificates",
-          showChevron: true,
-        },
-      ],
-    },
+    ...(isAdmin
+      ? []
+      : [
+          {
+            title: "Work",
+            items: [
+              {
+                icon: "access-time" as const,
+                label: "Attendance History",
+                subtitle: "View past attendance records",
+                showChevron: true,
+              },
+              {
+                icon: "event-note" as const,
+                label: "Leave Requests",
+                subtitle: "Apply & track leaves",
+                showChevron: true,
+              },
+              {
+                icon: "description" as const,
+                label: "Documents",
+                subtitle: "Payslips, letters, certificates",
+                showChevron: true,
+              },
+            ],
+          },
+        ]),
     {
       title: "Support",
       items: [
@@ -106,12 +112,6 @@ export default function ProfileScreen() {
           icon: "help-outline",
           label: "Help & Support",
           subtitle: "FAQs, contact support",
-          showChevron: true,
-        },
-        {
-          icon: "info-outline",
-          label: "About",
-          subtitle: "App version, terms",
           showChevron: true,
         },
       ],
@@ -346,28 +346,6 @@ export default function ProfileScreen() {
         </View>
       </View>
 
-      {/* Quick Stats */}
-      <View style={styles.statsRow}>
-        <View style={styles.statItem}>
-          <Text style={styles.statValue}>13</Text>
-          <Text style={styles.statLabel}>Present</Text>
-        </View>
-        <View style={styles.statDivider} />
-        <View style={styles.statItem}>
-          <Text style={styles.statValue}>02</Text>
-          <Text style={styles.statLabel}>Absent</Text>
-        </View>
-        <View style={styles.statDivider} />
-        <View style={styles.statItem}>
-          <Text style={styles.statValue}>04</Text>
-          <Text style={styles.statLabel}>Late</Text>
-        </View>
-        <View style={styles.statDivider} />
-        <View style={styles.statItem}>
-          <Text style={styles.statValue}>01</Text>
-          <Text style={styles.statLabel}>Leave</Text>
-        </View>
-      </View>
 
       {/* Menu Sections */}
       <View style={styles.content}>

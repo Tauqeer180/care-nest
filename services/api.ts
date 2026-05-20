@@ -74,6 +74,20 @@ interface RequestOptions {
   skipCompanyHeader?: boolean;
 }
 
+// Global session-expired handler — registered by AuthProvider on mount
+let sessionExpiredHandler: (() => void) | null = null;
+
+export function setSessionExpiredHandler(handler: () => void): void {
+  sessionExpiredHandler = handler;
+}
+
+function isAuthError(status: number, message?: string): boolean {
+  if (status === 401 || status === 403) return true;
+  if (!message) return false;
+  const lower = message.toLowerCase();
+  return lower.includes("invalid or expired token") || lower.includes("unauthorized");
+}
+
 export async function apiRequest<T>(
   endpoint: string,
   options: RequestOptions = {}
@@ -106,11 +120,16 @@ export async function apiRequest<T>(
   const data = await response.json();
 
   if (!response.ok) {
-    throw new ApiError(
-      data?.message || `Request failed with status ${response.status}`,
-      response.status,
-      data
-    );
+    const message = data?.message || `Request failed with status ${response.status}`;
+
+    // Detect expired/invalid session → trigger global logout.
+    // Only when a token was actually present — otherwise this is just bad credentials.
+    if (isAuthError(response.status, message) && token) {
+      sessionExpiredHandler?.();
+      throw new ApiError("SESSION_EXPIRED", response.status, data);
+    }
+
+    throw new ApiError(message, response.status, data);
   }
 
   return data as T;

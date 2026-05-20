@@ -3,17 +3,19 @@ import React from "react";
 
 import { HapticTab } from "@/components/haptic-tab";
 import { IconSymbol } from "@/components/ui/icon-symbol";
-import { Colors } from "@/constants/theme";
-import { useColorScheme } from "@/hooks/use-color-scheme";
+import { useTheme } from "@/hooks/useTheme";
+import { useAuth } from "@/hooks/useAuth";
 import { FontAwesome, MaterialIcons } from "@expo/vector-icons";
 
 export default function TabLayout() {
-  const colorScheme = useColorScheme();
+  const { colors } = useTheme();
+  const { isAdmin } = useAuth();
 
   return (
     <Tabs
       screenOptions={{
-        tabBarActiveTintColor: Colors[colorScheme ?? "light"].tint,
+        tabBarActiveTintColor: colors.tabBar.activeTint,
+        tabBarInactiveTintColor: colors.tabBar.inactiveTint,
         headerShown: false,
         tabBarButton: HapticTab,
       }}
@@ -25,6 +27,7 @@ export default function TabLayout() {
           tabBarIcon: ({ color }) => (
             <IconSymbol size={28} name="house.fill" color={color} />
           ),
+          href: isAdmin ? null : "/",
         }}
       />
       <Tabs.Screen
@@ -34,6 +37,7 @@ export default function TabLayout() {
           tabBarIcon: ({ color }) => (
             <MaterialIcons size={28} name="calendar-today" color={color} />
           ),
+          href: isAdmin ? null : "/attendance",
         }}
       />
       <Tabs.Screen
@@ -43,6 +47,17 @@ export default function TabLayout() {
           tabBarIcon: ({ color }) => (
             <FontAwesome size={28} name="briefcase" color={color} />
           ),
+          href: isAdmin ? null : "/job-pool",
+        }}
+      />
+      <Tabs.Screen
+        name="admin-jobs"
+        options={{
+          title: "Manage Jobs",
+          tabBarIcon: ({ color }) => (
+            <MaterialIcons size={28} name="business-center" color={color} />
+          ),
+          href: isAdmin ? "/admin-jobs" : null,
         }}
       />
       <Tabs.Screen
