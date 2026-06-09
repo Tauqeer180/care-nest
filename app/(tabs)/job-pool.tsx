@@ -108,9 +108,20 @@ export default function JobPoolScreen() {
                   </Text>
                 </View>
                 <View style={[styles.payBadge, { backgroundColor: colors.success + '15' }]}>
-                  <Text style={[styles.payText, { color: colors.success }]}>${job.pay_rate ?? 0}/hr</Text>
+                  <Text style={[styles.payText, { color: colors.success }]}>
+                    ${job.pay_rate ?? job.rate_used ?? 0}/hr
+                  </Text>
                 </View>
               </View>
+
+              {job.assignment_mode === 'split' && (
+                <View style={[styles.shiftBadge, { backgroundColor: colors.info }]}>
+                  <MaterialIcons name="call-split" size={12} color="#FFFFFF" />
+                  <Text style={styles.shiftBadgeText}>
+                    Shift {job.shift_index} of {job.total_in_group}
+                  </Text>
+                </View>
+              )}
 
               <Text
                 style={[styles.description, { color: colors.textSecondary }]}
@@ -139,7 +150,28 @@ export default function JobPoolScreen() {
                     {formatTime(job.start_time)} - {formatTime(job.end_time)}
                   </Text>
                 </View>
+                {job.estimated_earnings != null ? (
+                  <View style={styles.detailItem}>
+                    <MaterialIcons name="payments" size={14} color={colors.textTertiary} />
+                    <Text style={[styles.detailText, { color: colors.textSecondary }]}>
+                      Est. ${job.estimated_earnings}
+                      {job.estimated_hours != null ? ` · ${job.estimated_hours}h` : ''}
+                    </Text>
+                  </View>
+                ) : null}
               </View>
+
+              {job.group_label ? (
+                <View style={styles.detailsRow}>
+                  <View style={styles.detailItem}>
+                    <MaterialIcons name="layers" size={14} color={colors.textTertiary} />
+                    <Text style={[styles.detailText, { color: colors.textTertiary }]} numberOfLines={1}>
+                      {job.group_label}
+                      {job.group_estimated_earnings != null ? ` · Group est. $${job.group_estimated_earnings}` : ''}
+                    </Text>
+                  </View>
+                </View>
+              ) : null}
 
               {job.requirements ? (
                 <View style={[styles.requirementsBadge, { backgroundColor: colors.info + '10' }]}>
@@ -238,6 +270,21 @@ const styles = StyleSheet.create({
   payText: {
     fontSize: 14,
     fontWeight: '700',
+  },
+  shiftBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    alignSelf: 'flex-start',
+    gap: 4,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 12,
+    marginBottom: 10,
+  },
+  shiftBadgeText: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: '#FFFFFF',
   },
   description: {
     fontSize: 13,

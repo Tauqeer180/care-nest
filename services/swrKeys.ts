@@ -8,4 +8,6 @@ export const SWR_KEYS = {
     ["admin-jobs", page, limit, status] as const,
   adminJobDetail: (id: string) => ["admin-job-detail", id] as const,
   adminEmployees: () => ["admin-employees"] as const,
+  employeeDashboard: () => ["employee-dashboard"] as const,
+  employeeEarningsHistory: () => ["employee-earnings-history"] as const,
 };

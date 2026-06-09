@@ -1,5 +1,6 @@
 import { StyleSheet, ScrollView, View, Text, TouchableOpacity, ActivityIndicator } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
+import { useEffect } from 'react';
 import { useTheme } from '@/hooks/useTheme';
 import { Feather, MaterialIcons } from '@expo/vector-icons';
 import useSWR from 'swr';
@@ -18,6 +19,12 @@ export default function MyJobDetailScreen() {
   );
   const job = data?.data ?? null;
   const loading = isLoading;
+
+  useEffect(() => {
+    if (data) {
+      console.log("My job detail =>", JSON.stringify(data, null, 2));
+    }
+  }, [data]);
 
   const formatDate = (dateStr: string) => {
     const date = new Date(dateStr);
@@ -139,7 +146,9 @@ export default function MyJobDetailScreen() {
             </Text>
           </View>
           <View style={[styles.payChip, { backgroundColor: colors.success + '15' }]}>
-            <Text style={[styles.payRate, { color: colors.success }]}>${job.pay_rate ?? 0}/hr</Text>
+            <Text style={[styles.payRate, { color: colors.success }]}>
+              ${job.pay_rate ?? job.rate_used ?? 0}/hr
+            </Text>
           </View>
         </View>
 
@@ -174,31 +183,80 @@ export default function MyJobDetailScreen() {
         ) : null}
 
         {/* Earnings Summary */}
-        <View style={[styles.card, { backgroundColor: colors.card.background }]}>
-          <Text style={[styles.sectionTitle, { color: colors.textPrimary }]}>Earnings Summary</Text>
-          <View style={styles.earningsRow}>
-            <View style={styles.earningsItem}>
-              <Text style={[styles.earningsLabel, { color: colors.textTertiary }]}>Shift Hours</Text>
-              <Text style={[styles.earningsValue, { color: colors.textPrimary }]}>
-                {calculateShiftHours(job.start_time, job.end_time)}h
+        {(() => {
+          const rate = job.rate_used ?? job.pay_rate ?? 0;
+          const estHours = job.estimated_hours ?? calculateShiftHours(job.start_time, job.end_time);
+          const estTotal = job.estimated_earnings ?? estHours * rate;
+          return (
+            <View style={[styles.card, { backgroundColor: colors.card.background }]}>
+              <Text style={[styles.sectionTitle, { color: colors.textPrimary }]}>Earnings Summary</Text>
+              <View style={styles.earningsRow}>
+                <View style={styles.earningsItem}>
+                  <Text style={[styles.earningsLabel, { color: colors.textTertiary }]}>
+                    {job.total_shifts && job.total_shifts > 1 ? 'Total Hours' : 'Shift Hours'}
+                  </Text>
+                  <Text style={[styles.earningsValue, { color: colors.textPrimary }]}>{estHours}h</Text>
+                </View>
+                <View style={[styles.earningsDivider, { backgroundColor: colors.divider }]} />
+                <View style={styles.earningsItem}>
+                  <Text style={[styles.earningsLabel, { color: colors.textTertiary }]}>Hourly Rate</Text>
+                  <Text style={[styles.earningsValue, { color: colors.textPrimary }]}>${rate}</Text>
+                </View>
+                <View style={[styles.earningsDivider, { backgroundColor: colors.divider }]} />
+                <View style={styles.earningsItem}>
+                  <Text style={[styles.earningsLabel, { color: colors.textTertiary }]}>Estimated Total</Text>
+                  <Text style={[styles.earningsValue, { color: colors.success }]}>
+                    ${Number(estTotal).toFixed(2)}
+                  </Text>
+                </View>
+              </View>
+            </View>
+          );
+        })()}
+
+        {/* Booking Details — only for booking-sourced jobs */}
+        {(job.source === 'booking' || job.booking_id) && (
+          <View style={[styles.card, { backgroundColor: colors.card.background }]}>
+            <View style={styles.bookingHeader}>
+              <MaterialIcons name="event-note" size={20} color={colors.secondary} />
+              <Text style={[styles.sectionTitle, { color: colors.textPrimary, marginBottom: 0 }]}>
+                Booking Details
               </Text>
             </View>
-            <View style={[styles.earningsDivider, { backgroundColor: colors.divider }]} />
-            <View style={styles.earningsItem}>
-              <Text style={[styles.earningsLabel, { color: colors.textTertiary }]}>Hourly Rate</Text>
-              <Text style={[styles.earningsValue, { color: colors.textPrimary }]}>
-                ${job.pay_rate ?? 0}
-              </Text>
-            </View>
-            <View style={[styles.earningsDivider, { backgroundColor: colors.divider }]} />
-            <View style={styles.earningsItem}>
-              <Text style={[styles.earningsLabel, { color: colors.textTertiary }]}>Estimated Total</Text>
-              <Text style={[styles.earningsValue, { color: colors.success }]}>
-                ${(calculateShiftHours(job.start_time, job.end_time) * (job.pay_rate ?? 0)).toFixed(2)}
-              </Text>
-            </View>
+
+            {job.client_name ? (
+              <View style={styles.detailRow}>
+                <Text style={[styles.detailLabel, { color: colors.textTertiary }]}>Client</Text>
+                <Text style={[styles.detailValue, { color: colors.textPrimary }]}>{job.client_name}</Text>
+              </View>
+            ) : null}
+
+            {job.total_shifts != null ? (
+              <View style={styles.detailRow}>
+                <Text style={[styles.detailLabel, { color: colors.textTertiary }]}>Total Shifts</Text>
+                <Text style={[styles.detailValue, { color: colors.textPrimary }]}>{job.total_shifts}</Text>
+              </View>
+            ) : null}
+
+            {job.estimated_hours_per_shift != null ? (
+              <View style={styles.detailRow}>
+                <Text style={[styles.detailLabel, { color: colors.textTertiary }]}>Hours / Shift</Text>
+                <Text style={[styles.detailValue, { color: colors.textPrimary }]}>
+                  {job.estimated_hours_per_shift}h
+                </Text>
+              </View>
+            ) : null}
+
+            {job.booking_start_date && job.booking_end_date ? (
+              <View style={styles.detailRow}>
+                <Text style={[styles.detailLabel, { color: colors.textTertiary }]}>Date Range</Text>
+                <Text style={[styles.detailValue, { color: colors.textPrimary }]}>
+                  {formatDate(job.booking_start_date)} – {formatDate(job.booking_end_date)}
+                </Text>
+              </View>
+            ) : null}
           </View>
-        </View>
+        )}
 
         {/* Description */}
         <View style={[styles.card, { backgroundColor: colors.card.background }]}>
@@ -330,6 +388,15 @@ const styles = StyleSheet.create({
   earningsValue: { fontSize: 16, fontWeight: '700' },
   sectionTitle: { fontSize: 16, fontWeight: '700', marginBottom: 12 },
   bodyText: { fontSize: 14, lineHeight: 22 },
+  bookingHeader: { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 14 },
+  detailRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingVertical: 8,
+  },
+  detailLabel: { fontSize: 13 },
+  detailValue: { fontSize: 14, fontWeight: '600', flexShrink: 1, textAlign: 'right', marginLeft: 12 },
   infoRow: { flexDirection: 'row', alignItems: 'center', gap: 12, marginBottom: 14 },
   infoLabel: { fontSize: 12, fontWeight: '500' },
   infoValue: { fontSize: 14, fontWeight: '600', marginTop: 2 },

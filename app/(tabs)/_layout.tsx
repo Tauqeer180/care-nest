@@ -61,6 +61,16 @@ export default function TabLayout() {
         }}
       />
       <Tabs.Screen
+        name="admin-attendance"
+        options={{
+          title: "Attendance",
+          tabBarIcon: ({ color }) => (
+            <MaterialIcons size={28} name="fact-check" color={color} />
+          ),
+          href: isAdmin ? "/admin-attendance" : null,
+        }}
+      />
+      <Tabs.Screen
         name="profile"
         options={{
           title: "Profile",

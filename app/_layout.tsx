@@ -171,6 +171,14 @@ function RootLayoutContent() {
             options={{ headerShown: false }}
           />
           <Stack.Screen
+            name="admin-attendance-detail"
+            options={{ headerShown: false }}
+          />
+          <Stack.Screen
+            name="earnings-history"
+            options={{ headerShown: false }}
+          />
+          <Stack.Screen
             name="modal"
             options={{ presentation: "modal", title: "Modal" }}
           />

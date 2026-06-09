@@ -20,6 +20,28 @@ export interface Job {
   accepted_at?: string | null;
   created_date: string;
   modified_date: string;
+  assignment_mode?: string;
+  shift_index?: number;
+  total_in_group?: number;
+  // Booking-sourced jobs
+  source?: string;
+  booking_id?: string;
+  booking_details_doc_id?: string;
+  client_id?: string | null;
+  client_name?: string;
+  total_shifts?: number;
+  booking_start_date?: string;
+  booking_end_date?: string;
+  // Split-shift grouping
+  group_id?: string | null;
+  group_label?: string;
+  group_estimated_earnings?: number;
+  // Estimated earnings / hours
+  estimated_hours_per_shift?: number;
+  estimated_shift_count?: number;
+  estimated_hours?: number;
+  estimated_earnings?: number;
+  rate_used?: number;
 }
 
 export type AdminJobStatus = "all" | "1" | "2" | "3" | "4";

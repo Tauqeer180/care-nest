@@ -28,7 +28,7 @@ type Step = "company" | "credentials" | "otp";
 export default function LoginScreen() {
   const { colors } = useTheme();
   const router = useRouter();
-  const { setAuthed } = useAuth();
+  const { setAuthed, refreshUser } = useAuth();
 
   const [step, setStep] = useState<Step>("company");
   const [companyCode, setCompanyCode] = useState("");
@@ -144,8 +144,11 @@ export default function LoginScreen() {
     setLoading(true);
     try {
       await verifyOtp(loginUserId, otp, userType);
+      // Load the freshly stored user into auth context BEFORE flipping isAuthed,
+      // otherwise isAdmin stays false and admins get routed to employee screens.
+      await refreshUser();
       setAuthed(true);
-      // Route protection will auto-redirect to /(tabs)
+      // Route protection will auto-redirect based on role
     } catch (error: unknown) {
       const message =
         error instanceof Error ? error.message : "OTP verification failed";

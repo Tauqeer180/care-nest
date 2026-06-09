@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { StyleSheet, ScrollView, View, Text, TouchableOpacity, ActivityIndicator, Alert } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useTheme } from '@/hooks/useTheme';
@@ -20,6 +20,12 @@ export default function JobDetailScreen() {
   );
   const job = data?.data ?? null;
   const loading = isLoading;
+
+  useEffect(() => {
+    if (data) {
+      console.log("Job detail =>", JSON.stringify(data, null, 2));
+    }
+  }, [data]);
 
   const handleApply = async () => {
     if (!id) return;

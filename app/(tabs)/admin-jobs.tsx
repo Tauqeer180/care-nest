@@ -41,6 +41,7 @@ export default function AdminJobsScreen() {
   );
 
   const jobs = data ? data.flatMap((page) => page.data.jobs) : [];
+  console.log('Admin jobs list =>', JSON.stringify(jobs, null, 2));
   const lastPage = data ? data[data.length - 1] : null;
   const hasMore = lastPage?.data.pagination.hasMore ?? true;
   const totalJobs = lastPage?.data.pagination.total ?? 0;
@@ -192,6 +193,15 @@ export default function AdminJobsScreen() {
                   </View>
                 </View>
 
+                {job.assignment_mode === 'split' && (
+                  <View style={[styles.shiftBadge, { backgroundColor: colors.info }]}>
+                    <MaterialIcons name="call-split" size={12} color="#FFFFFF" />
+                    <Text style={[styles.shiftBadgeText, { color: '#FFFFFF' }]}>
+                      Shift {job.shift_index} of {job.total_in_group}
+                    </Text>
+                  </View>
+                )}
+
                 <View style={styles.detailsRow}>
                   <View style={styles.detailItem}>
                     <MaterialIcons name="location-pin" size={14} color={colors.textTertiary} />
@@ -331,6 +341,20 @@ const styles = StyleSheet.create({
     borderRadius: 3,
   },
   statusText: {
+    fontSize: 11,
+    fontWeight: '700',
+  },
+  shiftBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    alignSelf: 'flex-start',
+    gap: 4,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 12,
+    marginBottom: 8,
+  },
+  shiftBadgeText: {
     fontSize: 11,
     fontWeight: '700',
   },
