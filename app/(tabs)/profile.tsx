@@ -1,7 +1,11 @@
-import { useTheme } from "@/hooks/useTheme";
-import { getStoredCompanyInfo, getStoredUser, CompanyInfo, AuthUser } from "@/services/api";
-import { useSWRConfig } from "swr";
 import { useAuth } from "@/hooks/useAuth";
+import { useTheme } from "@/hooks/useTheme";
+import {
+  AuthUser,
+  CompanyInfo,
+  getStoredCompanyInfo,
+  getStoredUser,
+} from "@/services/api";
 import { MaterialIcons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
 import React, { useEffect, useState } from "react";
@@ -13,6 +17,7 @@ import {
   Text,
   View,
 } from "react-native";
+import { useSWRConfig } from "swr";
 
 interface MenuItem {
   icon: keyof typeof MaterialIcons.glyphMap;
@@ -69,12 +74,14 @@ export default function ProfileScreen() {
           label: "Personal Information",
           subtitle: "Name, email, phone",
           showChevron: true,
+          onPress: () => router.push("/personal-information"),
         },
         {
           icon: "lock-outline",
           label: "Change Password",
           subtitle: "Update your password",
           showChevron: true,
+          onPress: () => router.push("/change-password"),
         },
       ],
     },
@@ -89,16 +96,18 @@ export default function ProfileScreen() {
                 label: "Attendance History",
                 subtitle: "View past attendance records",
                 showChevron: true,
+                onPress: () =>
+                  router.push("/(tabs)/attendance?scrollTo=history"),
               },
               {
                 icon: "event-note" as const,
-                label: "Leave Requests",
+                label: "Leave Requests (Coming soon)",
                 subtitle: "Apply & track leaves",
                 showChevron: true,
               },
               {
                 icon: "description" as const,
-                label: "Documents",
+                label: "Documents (Coming soon)",
                 subtitle: "Payslips, letters, certificates",
                 showChevron: true,
               },
@@ -113,6 +122,14 @@ export default function ProfileScreen() {
           label: "Help & Support",
           subtitle: "FAQs, contact support",
           showChevron: true,
+          onPress: () =>
+            router.push({
+              pathname: "/webview",
+              params: {
+                url: "https://www.carenestlink.com/contactus",
+                title: "Help & Support",
+              },
+            }),
         },
       ],
     },
@@ -130,19 +147,6 @@ export default function ProfileScreen() {
       paddingHorizontal: 20,
       borderBottomLeftRadius: 30,
       borderBottomRightRadius: 30,
-    },
-    headerTopRow: {
-      flexDirection: "row",
-      justifyContent: "flex-end",
-      marginBottom: 16,
-    },
-    settingsButton: {
-      width: 36,
-      height: 36,
-      borderRadius: 18,
-      backgroundColor: "rgba(255,255,255,0.2)",
-      alignItems: "center",
-      justifyContent: "center",
     },
     profileSection: {
       alignItems: "center",
@@ -321,23 +325,20 @@ export default function ProfileScreen() {
     <ScrollView style={styles.container} showsVerticalScrollIndicator={false}>
       {/* Header with Avatar */}
       <View style={styles.header}>
-        <View style={styles.headerTopRow}>
-          <Pressable style={styles.settingsButton}>
-            <MaterialIcons name="settings" size={20} color="#FFFFFF" />
-          </Pressable>
-        </View>
         <View style={styles.profileSection}>
           <View style={styles.avatarContainer}>
             <Text style={styles.avatarText}>{initials || "?"}</Text>
           </View>
           <Text style={styles.profileName}>{fullName || "Loading..."}</Text>
           <Text style={styles.profileRole}>{roleLabel}</Text>
-          {user?.email && (
-            <Text style={styles.profileEmail}>{user.email}</Text>
-          )}
+          {user?.email && <Text style={styles.profileEmail}>{user.email}</Text>}
           {companyInfo && (
             <View style={styles.companyChip}>
-              <MaterialIcons name="business" size={14} color="rgba(255,255,255,0.9)" />
+              <MaterialIcons
+                name="business"
+                size={14}
+                color="rgba(255,255,255,0.9)"
+              />
               <Text style={styles.companyChipText}>
                 {companyInfo.companyName}
               </Text>
@@ -345,7 +346,6 @@ export default function ProfileScreen() {
           )}
         </View>
       </View>
-
 
       {/* Menu Sections */}
       <View style={styles.content}>
@@ -373,9 +373,7 @@ export default function ProfileScreen() {
                     <View style={styles.menuTextContainer}>
                       <Text style={styles.menuLabel}>{item.label}</Text>
                       {item.subtitle && (
-                        <Text style={styles.menuSubtitle}>
-                          {item.subtitle}
-                        </Text>
+                        <Text style={styles.menuSubtitle}>{item.subtitle}</Text>
                       )}
                     </View>
                     {item.showChevron && (

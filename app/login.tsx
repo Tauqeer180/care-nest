@@ -349,7 +349,7 @@ export default function LoginScreen() {
     },
     primaryButtonPressed: {
       opacity: 0.9,
-      backgroundColor: colors.primaryDark || "#CC5200",
+      backgroundColor: colors.brand.primaryDark,
     },
     primaryButtonText: {
       color: colors.button.primaryText,

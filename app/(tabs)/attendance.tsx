@@ -13,12 +13,19 @@ import {
   ActiveCheckIn,
   HistoryType,
   HistoryDaySummary,
+  HistoryRecord,
 } from '@/services/attendanceService';
-import { useFocusEffect } from 'expo-router';
+import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
+import { useAuth } from '@/hooks/useAuth';
 
 export default function AttendanceScreen() {
   const { colors } = useTheme();
   const insets = useSafeAreaInsets();
+  const { user } = useAuth();
+  const router = useRouter();
+  const { scrollTo } = useLocalSearchParams<{ scrollTo?: string }>();
+  const scrollRef = useRef<ScrollView>(null);
+  const historyY = useRef(0);
 
   const [loading, setLoading] = useState(true);
   const [actionLoading, setActionLoading] = useState(false);
@@ -95,6 +102,19 @@ export default function AttendanceScreen() {
     }, [fetchStatus])
   );
 
+  // Scroll to the History section when navigated with ?scrollTo=history
+  useFocusEffect(
+    useCallback(() => {
+      if (scrollTo !== 'history') return;
+      const timeout = setTimeout(() => {
+        scrollRef.current?.scrollTo({ y: historyY.current, animated: true });
+        // Clear the param so it doesn't re-trigger on subsequent focuses
+        router.setParams({ scrollTo: undefined });
+      }, 400);
+      return () => clearTimeout(timeout);
+    }, [scrollTo, router])
+  );
+
   const formatTime = (isoString: string | null | undefined) => {
     if (!isoString) return '--:--';
     return new Date(isoString).toLocaleTimeString('en-US', {
@@ -156,8 +176,32 @@ export default function AttendanceScreen() {
     );
   }
 
-  const checkInTimeStr = formatTime(activeCheckIn?.checkInTime);
-  const checkOutTimeStr = formatTime(activeCheckIn?.checkOutTime);
+  // Today's most recent completed session — used when there's no active
+  // check-in. Only today's sessions count; past days are ignored.
+  const todayStr = (() => {
+    const d = new Date();
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(
+      d.getDate()
+    ).padStart(2, '0')}`;
+  })();
+  const todaysLatestRecord = historyData
+    .flatMap((d) => d.records)
+    .filter((r) => r.checkInDate === todayStr)
+    .reduce<HistoryRecord | null>(
+      (latest, r) =>
+        !latest ||
+        new Date(r.checkInTime).getTime() > new Date(latest.checkInTime).getTime()
+          ? r
+          : latest,
+      null
+    );
+
+  const checkInTimeStr = isCheckedIn
+    ? formatTime(activeCheckIn?.checkInTime)
+    : formatTime(todaysLatestRecord?.checkInTime);
+  const checkOutTimeStr = isCheckedIn
+    ? formatTime(activeCheckIn?.checkOutTime)
+    : formatTime(todaysLatestRecord?.checkOutTime);
   const elapsed = getElapsedTime();
 
   const formatDateLabel = (dateStr: string) => {
@@ -166,20 +210,28 @@ export default function AttendanceScreen() {
   };
 
   return (
-    <ScrollView style={[styles.container, { backgroundColor: colors.background }]} showsVerticalScrollIndicator={false}>
+    <ScrollView ref={scrollRef} style={[styles.container, { backgroundColor: colors.background }]} showsVerticalScrollIndicator={false}>
       {/* Header */}
       <View style={styles.header}>
         <View>
           <Text style={[styles.greeting, { color: colors.textPrimary }]}>
-            {activeCheckIn?.userName ? `Hey ${activeCheckIn.userName.split(' ')[0]}` : 'Hey there'}
+            {user?.firstName
+              ? `Hey ${user.firstName}`
+              : activeCheckIn?.userName
+                ? `Hey ${activeCheckIn.userName.split(' ')[0]}`
+                : 'Hey there'}
           </Text>
           <Text style={[styles.subGreeting, { color: colors.textSecondary }]}>
             {isCheckedIn ? "You're currently checked in" : 'Mark your attendance'}
           </Text>
         </View>
-        <View style={[styles.avatar, { backgroundColor: colors.backgroundAlt }]}>
+        <TouchableOpacity
+          style={[styles.avatar, { backgroundColor: colors.backgroundAlt }]}
+          onPress={() => router.push("/(tabs)/profile")}
+          activeOpacity={0.7}
+        >
           <IconSymbol name="person.fill" size={24} color={colors.textSecondary} />
-        </View>
+        </TouchableOpacity>
       </View>
 
       {/* Time Display */}
@@ -266,7 +318,12 @@ export default function AttendanceScreen() {
       )}
 
       {/* History Section */}
-      <View style={[styles.historySection, { paddingBottom: 40 + insets.bottom }]}>
+      <View
+        style={[styles.historySection, { paddingBottom: 40 + insets.bottom }]}
+        onLayout={(e) => {
+          historyY.current = e.nativeEvent.layout.y;
+        }}
+      >
         <Text style={[styles.historySectionTitle, { color: colors.textPrimary }]}>History</Text>
 
         {/* Tabs */}

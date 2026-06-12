@@ -179,6 +179,15 @@ function RootLayoutContent() {
             options={{ headerShown: false }}
           />
           <Stack.Screen
+            name="personal-information"
+            options={{ headerShown: false }}
+          />
+          <Stack.Screen
+            name="change-password"
+            options={{ headerShown: false }}
+          />
+          <Stack.Screen name="webview" options={{ headerShown: false }} />
+          <Stack.Screen
             name="modal"
             options={{ presentation: "modal", title: "Modal" }}
           />
