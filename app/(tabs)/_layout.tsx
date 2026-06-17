@@ -71,6 +71,16 @@ export default function TabLayout() {
         }}
       />
       <Tabs.Screen
+        name="admin-leave"
+        options={{
+          title: "Leaves",
+          tabBarIcon: ({ color }) => (
+            <MaterialIcons size={28} name="event-note" color={color} />
+          ),
+          href: isAdmin ? "/admin-leave" : null,
+        }}
+      />
+      <Tabs.Screen
         name="profile"
         options={{
           title: "Profile",

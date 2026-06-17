@@ -1,5 +1,5 @@
-import { useTheme } from "@/hooks/useTheme";
 import { useAuth } from "@/hooks/useAuth";
+import { useTheme } from "@/hooks/useTheme";
 import { CompanyInfo, getStoredCompanyInfo } from "@/services/api";
 import {
   login,
@@ -122,7 +122,7 @@ export default function LoginScreen() {
       setStep("otp");
     } catch (error: unknown) {
       const message = error instanceof Error ? error.message : "Login failed";
-     console.log("Login error => ", error);
+      console.log("Login error => ", error);
       setPasswordError(message);
     } finally {
       setLoading(false);
@@ -652,8 +652,6 @@ export default function LoginScreen() {
           <Text style={styles.primaryButtonText}>Sign In</Text>
         )}
       </Pressable>
-
-     
     </>
   );
 

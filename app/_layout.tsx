@@ -188,6 +188,18 @@ function RootLayoutContent() {
           />
           <Stack.Screen name="webview" options={{ headerShown: false }} />
           <Stack.Screen
+            name="leave-requests"
+            options={{ headerShown: false }}
+          />
+          <Stack.Screen
+            name="leave-request-detail"
+            options={{ headerShown: false }}
+          />
+          <Stack.Screen
+            name="admin-leave-request-detail"
+            options={{ headerShown: false }}
+          />
+          <Stack.Screen
             name="modal"
             options={{ presentation: "modal", title: "Modal" }}
           />

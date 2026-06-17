@@ -101,9 +101,10 @@ export default function ProfileScreen() {
               },
               {
                 icon: "event-note" as const,
-                label: "Leave Requests (Coming soon)",
+                label: "Leave Requests",
                 subtitle: "Apply & track leaves",
                 showChevron: true,
+                onPress: () => router.push("/leave-requests"),
               },
               {
                 icon: "description" as const,

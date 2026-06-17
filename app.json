@@ -1,10 +1,10 @@
 {
   "expo": {
-    "name": "Home Care Plus",
+    "name": "HomeCare+",
     "slug": "care-nest",
     "version": "1.1.0",
     "orientation": "portrait",
-    "icon": "./assets/images/logo.png",
+    "icon": "./assets/images/app-icon.png",
     "scheme": "home-care-plus",
     "userInterfaceStyle": "automatic",
     "newArchEnabled": true,
@@ -13,19 +13,21 @@
       "bundleIdentifier": "com.tauqeer180.carenest",
       "googleServicesFile": "./GoogleService-Info.plist",
       "entitlements": {
-        "aps-environment": "production" /*development || production*/
+        "aps-environment": "production"
       },
       "infoPlist": {
         "ITSAppUsesNonExemptEncryption": false,
-        "UIBackgroundModes": ["remote-notification"]
+        "UIBackgroundModes": [
+          "remote-notification"
+        ]
       }
     },
     "android": {
       "googleServicesFile": "./google-services.json",
       "adaptiveIcon": {
         "backgroundColor": "#2332dd",
-        "foregroundImage": "./assets/images/logo.png",
-        "monochromeImage": "./assets/images/logo.png"
+        "foregroundImage": "./assets/images/app-icon.png",
+        "monochromeImage": "./assets/images/app-icon.png"
       },
       "edgeToEdgeEnabled": true,
       "predictiveBackGestureEnabled": false,
@@ -44,15 +46,16 @@
       [
         "expo-splash-screen",
         {
-          "image": "./assets/images/splash-logo.png",
-          "imageWidth": 200,
+          "image": "./assets/images/splash-icon-padded.png",
+          "imageWidth": 300,
           "resizeMode": "contain",
-          "backgroundColor": "#2332dd",
+          "backgroundColor": "#FFFFFF",
           "dark": {
-            "backgroundColor": "#2332dd"
+            "backgroundColor": "#FFFFFF"
           }
         }
-      ]
+      ],
+      "@react-native-community/datetimepicker"
     ],
     "experiments": {
       "typedRoutes": true,
