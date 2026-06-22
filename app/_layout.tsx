@@ -7,6 +7,7 @@ import {
 import { Stack, useRouter, useSegments } from "expo-router";
 import { StatusBar } from "expo-status-bar";
 import * as SplashScreen from "expo-splash-screen";
+import { mutate as globalMutate } from "swr";
 import "react-native-reanimated";
 
 // Keep the splash visible until auth state is resolved + navigation settled
@@ -26,6 +27,43 @@ import {
 import NotificationBanner, {
   showInAppNotification,
 } from "@/components/NotificationBanner";
+import { SWR_KEYS } from "@/services/swrKeys";
+
+// Refresh the notifications list + unread badge whenever a push arrives.
+function refreshNotificationData() {
+  globalMutate(SWR_KEYS.notificationsUnreadCount());
+  globalMutate((key) => Array.isArray(key) && key[0] === "notifications");
+}
+
+// Revalidate domain data affected by a push, based on its type. e.g. a new
+// pool job should refresh the job listing + the employee dashboard stats so
+// they update live without the user pulling to refresh.
+function refreshDataForMessage(data: Record<string, any> | undefined) {
+  switch (data?.type) {
+    case "NEW_POOL_JOB":
+      // Note: the job-pool listing is a useSWRInfinite list whose internal cache
+      // key isn't matchable here, so it self-refreshes via its own foreground
+      // listener in (tabs)/job-pool.tsx. Here we only refresh the dashboard stats.
+      globalMutate(SWR_KEYS.employeeDashboard());
+      break;
+    default:
+      break;
+  }
+}
+
+// Resolves the in-app route for a tapped push, based on its data payload.
+function routeForMessageData(data: Record<string, any> | undefined) {
+  if (!data) return null;
+  const jobId = data.jobId ?? data.job_id;
+  switch (data.type) {
+    case "NEW_POOL_JOB":
+      return jobId
+        ? { pathname: "/job-detail" as const, params: { id: String(jobId) } }
+        : null;
+    default:
+      return null;
+  }
+}
 
 const PUBLIC_ROUTES = ["login", "forgot-password", "reset-password", "register"];
 
@@ -68,6 +106,7 @@ export default function RootLayout() {
 
 function RootLayoutContent() {
   const colorScheme = useColorScheme();
+  const router = useRouter();
   const { authChecked, isAuthed, isAdmin } = useAuth();
 
   useProtectedRoute(authChecked, isAuthed, isAdmin);
@@ -88,25 +127,54 @@ function RootLayoutContent() {
 
   useEffect(() => {
     // Register FCM token
-    registerFCMToken();
+    registerFCMToken().then((token) => {
+      console.log("[NOTIF] FCM token registered:", token);
+    });
 
     // Listen for token refresh
-    const unsubTokenRefresh = onTokenRefresh();
+    const unsubTokenRefresh = onTokenRefresh((token) => {
+      console.log("[NOTIF] FCM token refreshed:", token);
+    });
 
     // Handle foreground notifications — show in-app banner
     const unsubForeground = onForegroundMessage((message) => {
+      console.log(
+        "[NOTIF] Foreground received:",
+        JSON.stringify(
+          { notification: message.notification, data: message.data, from: message.from },
+          null,
+          2
+        )
+      );
       showInAppNotification(message);
+      // Keep the bell badge + list in sync with the new notification.
+      refreshNotificationData();
+      // Refresh any domain data the notification affects (e.g. job listing + dashboard).
+      refreshDataForMessage(message.data);
     });
 
     // Handle notification tap from background
     const unsubOpenedApp = onNotificationOpenedApp((message) => {
-      console.log("Notification tapped (background):", message.data);
+      console.log(
+        "[NOTIF] Tapped (background):",
+        JSON.stringify({ notification: message.notification, data: message.data }, null, 2)
+      );
+      refreshNotificationData();
+      const route = routeForMessageData(message.data);
+      router.push(route ?? "/notifications");
     });
 
     // Check if app was opened from a quit-state notification
     getInitialNotification().then((message) => {
       if (message) {
-        console.log("Notification tapped (quit state):", message.data);
+        console.log(
+          "[NOTIF] Tapped (quit state):",
+          JSON.stringify({ notification: message.notification, data: message.data }, null, 2)
+        );
+        const route = routeForMessageData(message.data);
+        if (route) router.push(route);
+      } else {
+        console.log("[NOTIF] No quit-state notification");
       }
     });
 
@@ -188,6 +256,10 @@ function RootLayoutContent() {
           />
           <Stack.Screen name="webview" options={{ headerShown: false }} />
           <Stack.Screen
+            name="notifications"
+            options={{ headerShown: false }}
+          />
+          <Stack.Screen
             name="leave-requests"
             options={{ headerShown: false }}
           />
@@ -205,7 +277,12 @@ function RootLayoutContent() {
           />
         </Stack>
         <StatusBar style="auto" />
-        <NotificationBanner />
+        <NotificationBanner
+          onPress={(message) => {
+            const route = routeForMessageData(message.data);
+            router.push(route ?? "/notifications");
+          }}
+        />
       </NavigationThemeProvider>
     </ThemeProvider>
   );

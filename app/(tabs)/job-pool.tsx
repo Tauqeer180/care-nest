@@ -1,10 +1,11 @@
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useEffect } from 'react';
 import { StyleSheet, FlatList, View, Text, TouchableOpacity, ActivityIndicator, RefreshControl } from 'react-native';
 import { useRouter, useFocusEffect } from 'expo-router';
 import { useTheme } from '@/hooks/useTheme';
 import { Feather, MaterialIcons } from '@expo/vector-icons';
 import useSWRInfinite from 'swr/infinite';
 import { fetchJobPoolListings } from '@/services/jobPoolService';
+import { onForegroundMessage } from '@/services/notificationService';
 
 const PAGE_SIZE = 20;
 
@@ -27,13 +28,23 @@ export default function JobPoolScreen() {
   const hasMore = lastPage?.data.pagination.hasMore ?? true;
   const loadingMore = isValidating && size > 1 && data && size > data.length;
 
-  console.log("Jobs Listing ", jobs)
   // Revalidate when screen regains focus (e.g. after applying for a job)
   useFocusEffect(
     useCallback(() => {
       mutate();
     }, [mutate])
   );
+
+  // Live-refresh the list when a new pool job push arrives while the app is open.
+  // The bound infinite mutate() reliably revalidates all loaded pages — global
+  // key-matching does not work for useSWRInfinite's internal ($inf$) cache key.
+  useEffect(() => {
+    return onForegroundMessage((message) => {
+      if (message.data?.type === 'NEW_POOL_JOB') {
+        mutate();
+      }
+    });
+  }, [mutate]);
 
   const handleRefresh = useCallback(async () => {
     setRefreshing(true);

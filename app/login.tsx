@@ -7,6 +7,7 @@ import {
   validateCompanyCode,
   verifyOtp,
 } from "@/services/authService";
+import { registerFCMToken } from "@/services/notificationService";
 import { MaterialIcons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
 import React, { useEffect, useState } from "react";
@@ -147,6 +148,9 @@ export default function LoginScreen() {
       // Load the freshly stored user into auth context BEFORE flipping isAuthed,
       // otherwise isAdmin stays false and admins get routed to employee screens.
       await refreshUser();
+      // Register the FCM token now that we're authenticated, so it's associated
+      // with this user on the backend. Fire-and-forget — must not block login.
+      registerFCMToken();
       setAuthed(true);
       // Route protection will auto-redirect based on role
     } catch (error: unknown) {

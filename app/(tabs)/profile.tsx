@@ -10,7 +10,9 @@ import { MaterialIcons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
 import React, { useEffect, useState } from "react";
 import {
+  ActivityIndicator,
   Alert,
+  Modal,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -33,6 +35,7 @@ export default function ProfileScreen() {
   const router = useRouter();
   const [companyInfo, setCompanyInfo] = useState<CompanyInfo | null>(null);
   const [user, setUser] = useState<AuthUser | null>(null);
+  const [loggingOut, setLoggingOut] = useState(false);
   const { cache } = useSWRConfig();
   const { signOut } = useAuth();
 
@@ -54,10 +57,16 @@ export default function ProfileScreen() {
         text: "Logout",
         style: "destructive",
         onPress: async () => {
-          // Clear SWR cache so next user's data doesn't leak
-          for (const key of cache.keys()) cache.delete(key);
-          await signOut();
-          // Route protection will auto-redirect to /login
+          setLoggingOut(true);
+          try {
+            // Clear SWR cache so next user's data doesn't leak
+            for (const key of cache.keys()) cache.delete(key);
+            // signOut also auto-checks-out a checked-in employee (may take a moment)
+            await signOut();
+            // Route protection will auto-redirect to /login
+          } finally {
+            setLoggingOut(false);
+          }
         },
       },
     ]);
@@ -320,9 +329,30 @@ export default function ProfileScreen() {
       color: colors.textTertiary,
       marginTop: 20,
     },
+    logoutOverlay: {
+      flex: 1,
+      backgroundColor: "rgba(0,0,0,0.45)",
+      alignItems: "center",
+      justifyContent: "center",
+    },
+    logoutOverlayCard: {
+      backgroundColor: colors.card.background,
+      borderRadius: 16,
+      paddingVertical: 24,
+      paddingHorizontal: 32,
+      alignItems: "center",
+      gap: 14,
+      minWidth: 160,
+    },
+    logoutOverlayText: {
+      fontSize: 14,
+      fontWeight: "600",
+      color: colors.textPrimary,
+    },
   });
 
   return (
+    <>
     <ScrollView style={styles.container} showsVerticalScrollIndicator={false}>
       {/* Header with Avatar */}
       <View style={styles.header}>
@@ -400,5 +430,16 @@ export default function ProfileScreen() {
         <Text style={styles.versionText}>CareNest v1.0.0</Text>
       </View>
     </ScrollView>
+
+      {/* Full-screen blocking loader during logout */}
+      <Modal visible={loggingOut} transparent animationType="fade" statusBarTranslucent>
+        <View style={styles.logoutOverlay}>
+          <View style={styles.logoutOverlayCard}>
+            <ActivityIndicator size="large" color={colors.primary} />
+            <Text style={styles.logoutOverlayText}>Logging out…</Text>
+          </View>
+        </View>
+      </Modal>
+    </>
   );
 }

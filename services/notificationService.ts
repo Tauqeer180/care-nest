@@ -29,22 +29,30 @@ export async function requestNotificationPermission(): Promise<boolean> {
 }
 
 /**
- * Get the FCM token and register it with the backend
+ * Get the FCM token and register it with the backend.
+ *
+ * Note: token registration is intentionally decoupled from the OS notification
+ * permission. Acquiring/registering an FCM token does NOT require permission —
+ * permission only gates whether the OS *displays* tray notifications. By always
+ * registering the token, foreground messages are still delivered to the app
+ * (onMessage), so in-app notification banners and push-triggered refreshes keep
+ * working even when the user declines the permission prompt.
  */
 export async function registerFCMToken(): Promise<string | null> {
   try {
-    const permitted = await requestNotificationPermission();
-    if (!permitted) return null;
+    // Ask for display permission, but do NOT gate token registration on it.
+    // The result only affects whether the OS shows tray/lock-screen notifications.
+    await requestNotificationPermission();
 
     const token = await messaging().getToken();
     console.log("FCM Token:", token);
-    
+
     // Check if token changed since last registration
     const storedToken = await AsyncStorage.getItem(FCM_TOKEN_KEY);
-    if (storedToken !== token) {
-      await sendTokenToBackend(token);
-      await AsyncStorage.setItem(FCM_TOKEN_KEY, token);
-    }
+    await sendTokenToBackend(token);
+    await AsyncStorage.setItem(FCM_TOKEN_KEY, token);
+    // if (storedToken !== token) {
+    // }
 
     return token;
   } catch (error) {
@@ -122,6 +130,17 @@ export async function getInitialNotification(): Promise<FirebaseMessagingTypes.R
  */
 export function setBackgroundMessageHandler(): void {
   messaging().setBackgroundMessageHandler(async (remoteMessage) => {
-    console.log("Background notification:", JSON.stringify(remoteMessage, null, 2));
+    console.log(
+      "[NOTIF] Background received:",
+      JSON.stringify(
+        {
+          notification: remoteMessage.notification,
+          data: remoteMessage.data,
+          from: remoteMessage.from,
+        },
+        null,
+        2
+      )
+    );
   });
 }

@@ -8,6 +8,7 @@ import {
 } from "@/services/attendanceService";
 import { getEmployeeDashboard } from "@/services/dashboardService";
 import { fetchMyJobs } from "@/services/jobPoolService";
+import { getUnreadCount } from "@/services/notificationsService";
 import { SWR_KEYS } from "@/services/swrKeys";
 import { Feather, MaterialIcons } from "@expo/vector-icons";
 import { useFocusEffect, useRouter } from "expo-router";
@@ -59,6 +60,13 @@ export default function HomeScreen() {
     !isAdmin && user ? SWR_KEYS.employeeDashboard() : null,
     getEmployeeDashboard,
     { revalidateOnFocus: true },
+  );
+
+  // SWR: Unread notifications count (all users)
+  const { data: unreadCount = 0 } = useSWR(
+    user ? SWR_KEYS.notificationsUnreadCount() : null,
+    getUnreadCount,
+    { revalidateOnFocus: true }
   );
 
   useEffect(() => {
@@ -140,7 +148,20 @@ export default function HomeScreen() {
         <View style={styles.headerTop}>
           <IconSymbol name="gearshape.fill" size={24} color="white" />
           <Text style={styles.headerTitle}>CareNest</Text>
-          <IconSymbol name="bell.fill" size={24} color="white" />
+          <TouchableOpacity
+            onPress={() => router.push("/notifications")}
+            hitSlop={8}
+            activeOpacity={0.7}
+          >
+            <MaterialIcons name="notifications" size={24} color="white" />
+            {unreadCount > 0 && (
+              <View style={styles.bellBadge}>
+                <Text style={styles.bellBadgeText}>
+                  {unreadCount > 99 ? "99+" : unreadCount}
+                </Text>
+              </View>
+            )}
+          </TouchableOpacity>
         </View>
         {/* <Text style={styles.location}>Thumbu Chatty St, Chennai</Text> */}
         <View style={styles.welcomeRow}>
@@ -702,6 +723,23 @@ const styles = StyleSheet.create({
     fontSize: 18,
     fontWeight: "600",
     color: "white",
+  },
+  bellBadge: {
+    position: "absolute",
+    top: -6,
+    right: -8,
+    minWidth: 18,
+    height: 18,
+    borderRadius: 9,
+    backgroundColor: "#EF4444",
+    alignItems: "center",
+    justifyContent: "center",
+    paddingHorizontal: 4,
+  },
+  bellBadgeText: {
+    color: "white",
+    fontSize: 10,
+    fontWeight: "700",
   },
   location: {
     fontSize: 12,

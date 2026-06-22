@@ -10,4 +10,7 @@ export const SWR_KEYS = {
   adminEmployees: () => ["admin-employees"] as const,
   employeeDashboard: () => ["employee-dashboard"] as const,
   employeeEarningsHistory: () => ["employee-earnings-history"] as const,
+  notifications: (page: number, limit: number) =>
+    ["notifications", page, limit] as const,
+  notificationsUnreadCount: () => ["notifications-unread-count"] as const,
 };
