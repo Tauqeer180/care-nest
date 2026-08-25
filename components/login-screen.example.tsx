@@ -214,7 +214,7 @@ export default function LoginScreen() {
       <View style={dynamicStyles.headerContainer}>
         <Text style={dynamicStyles.welcomeText}>Welcome Back</Text>
         <Text style={dynamicStyles.subtitleText}>
-          Sign in to your CareNest account
+          Sign in to your HomeCare+ account
         </Text>
       </View>
 

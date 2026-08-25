@@ -1,0 +1,25 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(find /media/tauqeer-abbas/00594578-36cb-48f2-9f79-1b29965b1454/PERSONAL/care-nest/services -type f -name *.ts -o -name *.tsx -o -name *.js -o -name *.json)",
+      "Bash(ls -la \"/media/tauqeer-abbas/00594578-36cb-48f2-9f79-1b29965b1454/PERSONAL/care-nest/app/\\(tabs\\)\")",
+      "Bash(npx expo:*)",
+      "Bash(npm ls:*)",
+      "Bash(npm install *)",
+      "Bash(npx tsc *)",
+      "Bash(grep -n \"This Month\\\\|monthGrid\\\\|styles.card, { backgroundColor: colors.card.background }\\\\]}>\" \"app/\\(tabs\\)/index.tsx\")",
+      "Bash(convert \"splash-logo.jpeg\" \"splash-logo.png\")",
+      "Bash(identify assets/images/logo.jpeg assets/images/logo.png)",
+      "Bash(convert assets/images/logo.jpeg assets/images/app-icon.png)",
+      "Bash(identify assets/images/app-icon.png)",
+      "Bash(identify -format \"%wx%h\\\\n\" assets/images/splash-logo.png)",
+      "Bash(identify -format \"%wx%h\\\\n\" assets/images/logo.jpeg)",
+      "Bash(identify -format \"%wx%h\\\\n\" \"assets/images/icon logo.jpeg\")",
+      "Bash(convert \"assets/images/icon logo.jpeg\" \"assets/images/app-icon.png\")",
+      "Bash(identify -format \"app-icon.png: %wx%h\\\\n\" assets/images/app-icon.png)",
+      "Bash(convert \"assets/images/splash-logo.jpeg\" -format \"%[pixel:p{0,0}]\\\\n\" info:)",
+      "Bash(convert \"assets/images/splash-logo.jpeg\" -format \"%[pixel:p{512,20}]\\\\n\" info:)",
+      "Bash(grep -nA3 -iE \"firebase|messaging|aps-environment|UIBackgroundModes|entitlements|googleServices|bundleIdentifier|ios\" app.json)"
+    ]
+  }
+}

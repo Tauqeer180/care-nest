@@ -7,6 +7,7 @@ import {
   getStoredUser,
 } from "@/services/api";
 import { MaterialIcons } from "@expo/vector-icons";
+import Constants from "expo-constants";
 import { useRouter } from "expo-router";
 import React, { useEffect, useState } from "react";
 import {
@@ -115,12 +116,12 @@ export default function ProfileScreen() {
                 showChevron: true,
                 onPress: () => router.push("/leave-requests"),
               },
-              {
-                icon: "description" as const,
-                label: "Documents (Coming soon)",
-                subtitle: "Payslips, letters, certificates",
-                showChevron: true,
-              },
+              // {
+              //   icon: "description" as const,
+              //   label: "Documents (Coming soon)",
+              //   subtitle: "Payslips, letters, certificates",
+              //   showChevron: true,
+              // },
             ],
           },
         ]),
@@ -427,7 +428,9 @@ export default function ProfileScreen() {
           <Text style={styles.logoutText}>Logout</Text>
         </Pressable>
 
-        <Text style={styles.versionText}>CareNest v1.0.0</Text>
+        <Text style={styles.versionText}>
+          HomeCare+ v{Constants.expoConfig?.version ?? "1.0.0"}
+        </Text>
       </View>
     </ScrollView>
 

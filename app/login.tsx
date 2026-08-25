@@ -503,7 +503,7 @@ export default function LoginScreen() {
         <MaterialIcons name="login" size={34} color={colors.primary} />
         <Text style={styles.welcomeText}>Welcome Back</Text>
         <Text style={styles.subtitleText}>
-          Sign in to your CareNest account
+          Sign in to your HomeCare+ account
         </Text>
       </View>
 

@@ -147,7 +147,7 @@ export default function HomeScreen() {
       <View style={[styles.header, { backgroundColor: colors.primary }]}>
         <View style={styles.headerTop}>
           <IconSymbol name="gearshape.fill" size={24} color="white" />
-          <Text style={styles.headerTitle}>CareNest</Text>
+          <Text style={styles.headerTitle}>HomeCare+</Text>
           <TouchableOpacity
             onPress={() => router.push("/notifications")}
             hitSlop={8}
