@@ -13,4 +13,9 @@ export const SWR_KEYS = {
   notifications: (page: number, limit: number) =>
     ["notifications", page, limit] as const,
   notificationsUnreadCount: () => ["notifications-unread-count"] as const,
+  clientBookings: (source: string, page: number, limit: number) =>
+    ["client-bookings", source, page, limit] as const,
+  clientBookingDetail: (id: string, source: string) =>
+    ["client-booking-detail", id, source] as const,
+  clientProfile: () => ["client-profile"] as const,
 };

@@ -4,9 +4,11 @@
  * Screen for users to reset their password via email
  */
 
+import { ACCOUNT_TYPE_OPTIONS, identifierLabel } from "@/constants/accountTypes";
 import { useTheme } from "@/hooks/useTheme";
 import { getStoredCompanyInfo } from "@/services/api";
-import { forgotPassword, UserType } from "@/services/authService";
+import { AccountType, forgotPassword, UserType } from "@/services/authService";
+import { clientForgotPassword } from "@/services/clientAuthService";
 import { useRouter } from "expo-router";
 import React, { useEffect, useState } from "react";
 import {
@@ -29,7 +31,7 @@ export default function ForgotPasswordScreen() {
   const router = useRouter();
 
   const [email, setEmail] = useState("");
-  const [userType, setUserType] = useState<UserType>("employee");
+  const [userType, setUserType] = useState<AccountType>("employee");
   const [companyCode, setCompanyCode] = useState("");
   const [loading, setLoading] = useState(false);
   const [emailFocused, setEmailFocused] = useState(false);
@@ -43,6 +45,10 @@ export default function ForgotPasswordScreen() {
     });
   }, []);
 
+  // Clients identify by username (which may also be an email), so the field
+  // label and its validation differ from staff.
+  const isClient = userType === "client";
+
   const validateEmail = (value: string) => {
     return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value);
   };
@@ -51,18 +57,20 @@ export default function ForgotPasswordScreen() {
     setEmailError("");
 
     if (!email.trim()) {
-      setEmailError("Email is required");
+      setEmailError(isClient ? "Username is required" : "Email is required");
       return;
     }
 
-    if (!validateEmail(email)) {
+    if (!isClient && !validateEmail(email)) {
       setEmailError("Please enter a valid email");
       return;
     }
 
     setLoading(true);
     try {
-      const response = await forgotPassword(email, companyCode, userType);
+      const response = isClient
+        ? await clientForgotPassword(email.trim(), companyCode)
+        : await forgotPassword(email, companyCode, userType as UserType);
       router.push({
         pathname: "/reset-password",
         params: {
@@ -276,45 +284,38 @@ export default function ForgotPasswordScreen() {
               <View style={styles.userTypeContainer}>
                 <Text style={styles.label}>I am a</Text>
                 <View style={styles.userTypeToggle}>
-                  <Pressable
-                    style={[
-                      styles.userTypeOption,
-                      userType === "employee" && styles.userTypeOptionActive,
-                    ]}
-                    onPress={() => setUserType("employee")}
-                  >
-                    <Text
+                  {ACCOUNT_TYPE_OPTIONS.map((option) => (
+                    <Pressable
+                      key={option.value}
                       style={[
-                        styles.userTypeText,
-                        userType === "employee" && styles.userTypeTextActive,
+                        styles.userTypeOption,
+                        userType === option.value && styles.userTypeOptionActive,
                       ]}
+                      onPress={() => {
+                        setUserType(option.value);
+                        setEmailError("");
+                      }}
+                      disabled={loading}
                     >
-                      Employee
-                    </Text>
-                  </Pressable>
-                  <Pressable
-                    style={[
-                      styles.userTypeOption,
-                      userType === "superadmin" && styles.userTypeOptionActive,
-                    ]}
-                    onPress={() => setUserType("superadmin")}
-                  >
-                    <Text
-                      style={[
-                        styles.userTypeText,
-                        userType === "superadmin" && styles.userTypeTextActive,
-                      ]}
-                    >
-                      Admin
-                    </Text>
-                  </Pressable>
+                      <Text
+                        style={[
+                          styles.userTypeText,
+                          userType === option.value &&
+                            styles.userTypeTextActive,
+                        ]}
+                      >
+                        {option.label}
+                      </Text>
+                    </Pressable>
+                  ))}
                 </View>
               </View>
 
               {/* Email */}
               <View style={styles.inputGroup}>
                 <Text style={styles.label}>
-                  Email Address<Text style={styles.labelRequired}>*</Text>
+                  {identifierLabel(userType)}
+                  <Text style={styles.labelRequired}>*</Text>
                 </Text>
                 <TextInput
                   style={[styles.input, emailFocused && styles.inputFocused]}

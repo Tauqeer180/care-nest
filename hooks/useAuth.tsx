@@ -10,12 +10,16 @@ const SESSION_MAX_AGE_MS = 24 * 60 * 60 * 1000; // 24 hours
 /**
  * Best-effort: if the current user is a checked-in employee, check them out.
  * Never throws — used on both deliberate logout and session expiry, and must
- * not block either. Skipped for admins (no check-in concept).
+ * not block either. Skipped for admins and clients (no check-in concept).
  */
 async function autoCheckoutEmployee(): Promise<void> {
   try {
     const storedUser = await getStoredUser();
-    if (storedUser && storedUser.userType !== "superadmin") {
+    if (
+      storedUser &&
+      storedUser.userType !== "superadmin" &&
+      storedUser.userType !== "client"
+    ) {
       const status = await getAttendanceStatus();
       if (status.isCheckedIn) {
         await checkOut();
@@ -31,6 +35,7 @@ interface AuthContextValue {
   authChecked: boolean;
   user: AuthUser | null;
   isAdmin: boolean;
+  isClient: boolean;
   setAuthed: (value: boolean) => void;
   refreshUser: () => Promise<void>;
   signOut: () => Promise<void>;
@@ -139,6 +144,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, [isAuthed, enforceSessionExpiry]);
 
   const isAdmin = user?.userType === "superadmin";
+  const isClient = user?.userType === "client";
 
   // Register global handler so apiRequest can trigger logout on expired tokens
   useEffect(() => {
@@ -150,7 +156,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, []);
 
   return (
-    <AuthContext.Provider value={{ isAuthed, authChecked, user, isAdmin, setAuthed: setIsAuthed, refreshUser, signOut }}>
+    <AuthContext.Provider value={{ isAuthed, authChecked, user, isAdmin, isClient, setAuthed: setIsAuthed, refreshUser, signOut }}>
       {children}
     </AuthContext.Provider>
   );

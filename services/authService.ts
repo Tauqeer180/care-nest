@@ -45,7 +45,17 @@ export async function validateCompanyCode(
   return response.data;
 }
 
+/**
+ * Account types accepted by the *staff* auth routes (/mobile/login,
+ * /mobile/verify-otp, ...). Clients are deliberately NOT in this union: they
+ * authenticate through /mobile/client/* (see services/clientAuthService.ts)
+ * and those routes take no userType at all, so passing "client" here would be
+ * a bug the type system should catch.
+ */
 export type UserType = "employee" | "superadmin";
+
+/** Every account type the app can hold a session for. */
+export type AccountType = UserType | "client";
 
 interface ForgotPasswordResponse {
   success: boolean;

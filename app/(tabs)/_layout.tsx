@@ -9,7 +9,10 @@ import { FontAwesome, MaterialIcons } from "@expo/vector-icons";
 
 export default function TabLayout() {
   const { colors } = useTheme();
-  const { isAdmin } = useAuth();
+  const { isAdmin, isClient } = useAuth();
+
+  // Employee-only tabs: hidden from both admins and clients.
+  const employeeOnly = !isAdmin && !isClient;
 
   return (
     <Tabs
@@ -27,7 +30,7 @@ export default function TabLayout() {
           tabBarIcon: ({ color }) => (
             <IconSymbol size={28} name="house.fill" color={color} />
           ),
-          href: isAdmin ? null : "/",
+          href: employeeOnly ? "/" : null,
         }}
       />
       <Tabs.Screen
@@ -37,7 +40,7 @@ export default function TabLayout() {
           tabBarIcon: ({ color }) => (
             <MaterialIcons size={28} name="calendar-today" color={color} />
           ),
-          href: isAdmin ? null : "/attendance",
+          href: employeeOnly ? "/attendance" : null,
         }}
       />
       <Tabs.Screen
@@ -47,7 +50,7 @@ export default function TabLayout() {
           tabBarIcon: ({ color }) => (
             <FontAwesome size={28} name="briefcase" color={color} />
           ),
-          href: isAdmin ? null : "/job-pool",
+          href: employeeOnly ? "/job-pool" : null,
         }}
       />
       <Tabs.Screen
@@ -81,12 +84,34 @@ export default function TabLayout() {
         }}
       />
       <Tabs.Screen
+        name="client-bookings"
+        options={{
+          title: "My Bookings",
+          tabBarIcon: ({ color }) => (
+            <MaterialIcons size={28} name="event-available" color={color} />
+          ),
+          href: isClient ? "/client-bookings" : null,
+        }}
+      />
+      <Tabs.Screen
         name="profile"
         options={{
           title: "Profile",
           tabBarIcon: ({ color }) => (
             <IconSymbol size={28} name="person" color={color} />
           ),
+          // Staff profile — clients get their own below.
+          href: isClient ? null : "/profile",
+        }}
+      />
+      <Tabs.Screen
+        name="client-profile"
+        options={{
+          title: "Profile",
+          tabBarIcon: ({ color }) => (
+            <IconSymbol size={28} name="person" color={color} />
+          ),
+          href: isClient ? "/client-profile" : null,
         }}
       />
     </Tabs>

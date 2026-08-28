@@ -17,7 +17,16 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useTheme } from "@/hooks/useTheme";
 import { MaterialIcons } from "@expo/vector-icons";
 import { getStoredUser, getStoredCompanyInfo } from "@/services/api";
-import { forgotPassword, resetPassword, UserType } from "@/services/authService";
+import {
+  AccountType,
+  forgotPassword,
+  resetPassword,
+  UserType,
+} from "@/services/authService";
+import {
+  clientForgotPassword,
+  resetClientPassword,
+} from "@/services/clientAuthService";
 
 type Step = "request" | "verify";
 
@@ -28,7 +37,7 @@ export default function ChangePasswordScreen() {
 
   const [email, setEmail] = useState("");
   const [companyCode, setCompanyCode] = useState("");
-  const [userType, setUserType] = useState<UserType>("employee");
+  const [userType, setUserType] = useState<AccountType>("employee");
   const [userId, setUserId] = useState("");
 
   const [step, setStep] = useState<Step>("request");
@@ -47,7 +56,7 @@ export default function ChangePasswordScreen() {
     Promise.all([getStoredUser(), getStoredCompanyInfo()]).then(([u, c]) => {
       if (u) {
         setEmail(u.email);
-        setUserType((u.userType as UserType) ?? "employee");
+        setUserType((u.userType as AccountType) ?? "employee");
       }
       if (c?.companyCode) setCompanyCode(c.companyCode);
     });
@@ -60,7 +69,11 @@ export default function ChangePasswordScreen() {
     }
     setLoading(true);
     try {
-      const res = await forgotPassword(email, companyCode, userType);
+      // Clients reset through /mobile/client/* — the staff route rejects them.
+      const res =
+        userType === "client"
+          ? await clientForgotPassword(email, companyCode)
+          : await forgotPassword(email, companyCode, userType as UserType);
       setUserId(res.data.userId);
       setStep("verify");
     } catch (error: any) {
@@ -96,7 +109,11 @@ export default function ChangePasswordScreen() {
 
     setLoading(true);
     try {
-      await resetPassword(userId, otp, newPassword, userType);
+      if (userType === "client") {
+        await resetClientPassword(userId, otp, newPassword);
+      } else {
+        await resetPassword(userId, otp, newPassword, userType as UserType);
+      }
       Alert.alert("Success", "Your password has been changed successfully.", [
         { text: "OK", onPress: () => router.back() },
       ]);

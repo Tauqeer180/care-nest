@@ -1,7 +1,7 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import messaging, { FirebaseMessagingTypes } from "@react-native-firebase/messaging";
 import { PermissionsAndroid, Platform } from "react-native";
-import { apiRequest } from "./api";
+import { apiRequest, getSessionKind } from "./api";
 
 const FCM_TOKEN_KEY = "@carenest/fcm_token";
 
@@ -66,7 +66,11 @@ export async function registerFCMToken(): Promise<string | null> {
  */
 async function sendTokenToBackend(token: string): Promise<void> {
   try {
-    await apiRequest("/mobile/fcm-token", {
+    // Clients register against their own route — the staff one rejects a client JWT.
+    const kind = await getSessionKind();
+    const endpoint =
+      kind === "client" ? "/mobile/client/fcm-token" : "/mobile/fcm-token";
+    await apiRequest(endpoint, {
       method: "POST",
       body: {
         fcm_token: token,

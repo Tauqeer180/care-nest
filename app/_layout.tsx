@@ -67,7 +67,12 @@ function routeForMessageData(data: Record<string, any> | undefined) {
 
 const PUBLIC_ROUTES = ["login", "forgot-password", "reset-password", "register"];
 
-function useProtectedRoute(authChecked: boolean, isAuthed: boolean, isAdmin: boolean) {
+function useProtectedRoute(
+  authChecked: boolean,
+  isAuthed: boolean,
+  isAdmin: boolean,
+  isClient: boolean
+) {
   const segments = useSegments();
   const router = useRouter();
 
@@ -78,15 +83,23 @@ function useProtectedRoute(authChecked: boolean, isAuthed: boolean, isAdmin: boo
     const isPublic = !first || PUBLIC_ROUTES.includes(first);
     const isOnHomeTab = first === "(tabs)" && !second;
 
+    // Landing tab per role: clients see their bookings, admins Manage Jobs,
+    // employees the home dashboard.
+    const homeRoute = isClient
+      ? "/(tabs)/client-bookings"
+      : isAdmin
+        ? "/(tabs)/admin-jobs"
+        : "/(tabs)";
+
     if (!isAuthed && !isPublic) {
       router.replace("/login");
     } else if (isAuthed && isPublic) {
-      router.replace(isAdmin ? "/(tabs)/admin-jobs" : "/(tabs)");
-    } else if (isAuthed && isAdmin && isOnHomeTab) {
-      // Admin has no home screen — redirect to Manage Jobs
-      router.replace("/(tabs)/admin-jobs");
+      router.replace(homeRoute);
+    } else if (isAuthed && (isAdmin || isClient) && isOnHomeTab) {
+      // Neither admins nor clients have the employee home screen.
+      router.replace(homeRoute);
     }
-  }, [authChecked, isAuthed, isAdmin, segments, router]);
+  }, [authChecked, isAuthed, isAdmin, isClient, segments, router]);
 }
 
 // Register background handler — must be outside component
@@ -107,9 +120,9 @@ export default function RootLayout() {
 function RootLayoutContent() {
   const colorScheme = useColorScheme();
   const router = useRouter();
-  const { authChecked, isAuthed, isAdmin } = useAuth();
+  const { authChecked, isAuthed, isAdmin, isClient } = useAuth();
 
-  useProtectedRoute(authChecked, isAuthed, isAdmin);
+  useProtectedRoute(authChecked, isAuthed, isAdmin, isClient);
 
   // Hide native splash only after auth state is resolved AND navigation has settled
   // on the correct screen — eliminates the (tabs) → login flicker on cold start.
@@ -269,6 +282,14 @@ function RootLayoutContent() {
           />
           <Stack.Screen
             name="admin-leave-request-detail"
+            options={{ headerShown: false }}
+          />
+          <Stack.Screen
+            name="client-booking-detail"
+            options={{ headerShown: false }}
+          />
+          <Stack.Screen
+            name="client-edit-profile"
             options={{ headerShown: false }}
           />
           <Stack.Screen

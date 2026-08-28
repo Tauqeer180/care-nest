@@ -6,6 +6,7 @@
 
 import { useTheme } from "@/hooks/useTheme";
 import { resetPassword, UserType } from "@/services/authService";
+import { resetClientPassword } from "@/services/clientAuthService";
 import { MaterialIcons } from "@expo/vector-icons";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import React, { useState } from "react";
@@ -77,7 +78,12 @@ export default function ResetPasswordScreen() {
 
     setLoading(true);
     try {
-      await resetPassword(userId!, otp, newPassword, userType as UserType);
+      // The userType param comes straight from the forgot-password response.
+      if (userType === "client") {
+        await resetClientPassword(userId!, otp, newPassword);
+      } else {
+        await resetPassword(userId!, otp, newPassword, userType as UserType);
+      }
       setSuccess(true);
     } catch (error: any) {
       Alert.alert("Error", error.message || "Failed to reset password");

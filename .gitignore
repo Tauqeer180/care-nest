@@ -24,6 +24,8 @@ CLAUDE.md
 # Metro
 .metro-health-check*
 
+*.postman_collection.json
+
 # debug
 npm-debug.*
 yarn-debug.*

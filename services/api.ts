@@ -1,10 +1,22 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
 
-const BASE_URL = "https://ohc-saas-backend.onrender.com/api";
+// const BASE_URL = "https://ohc-saas-backend.onrender.com/api";
+const BASE_URL = "https://care-nest-backend.onrender.com/api";
 const COMPANY_STORAGE_KEY = "@carenest/company_info";
 const AUTH_TOKEN_KEY = "@carenest/auth_token";
 const AUTH_USER_KEY = "@carenest/auth_user";
 const AUTH_LOGIN_AT_KEY = "@carenest/login_at";
+const AUTH_SESSION_KIND_KEY = "@carenest/session_kind";
+
+/**
+ * Which auth surface the current session was created through.
+ * "staff"  → /mobile/*        (employee + superadmin)
+ * "client" → /mobile/client/* (clients have their own login, refresh and
+ *                              fcm-token routes with different payloads)
+ * Persisted at login rather than derived from user.userType, so the routing
+ * decision never depends on the exact shape the server returns.
+ */
+export type SessionKind = "staff" | "client";
 
 export interface CompanyInfo {
   companyName: string;
@@ -42,11 +54,29 @@ export interface AuthUser {
   entity_type: number;
 }
 
-export async function storeAuthData(token: string, user: AuthUser): Promise<void> {
+export async function storeAuthData(
+  token: string,
+  user: AuthUser,
+  kind: SessionKind = "staff"
+): Promise<void> {
   await AsyncStorage.setItem(AUTH_TOKEN_KEY, token);
   await AsyncStorage.setItem(AUTH_USER_KEY, JSON.stringify(user));
+  await AsyncStorage.setItem(AUTH_SESSION_KIND_KEY, kind);
   // Stamp the login time — used to enforce a hard session lifetime cap.
   await AsyncStorage.setItem(AUTH_LOGIN_AT_KEY, String(Date.now()));
+}
+
+/**
+ * Which auth surface the stored session belongs to. Defaults to "staff" so
+ * sessions created before client support existed keep working unchanged.
+ */
+export async function getSessionKind(): Promise<SessionKind> {
+  try {
+    const raw = await AsyncStorage.getItem(AUTH_SESSION_KIND_KEY);
+    return raw === "client" ? "client" : "staff";
+  } catch {
+    return "staff";
+  }
 }
 
 /**
@@ -81,11 +111,27 @@ export async function getStoredUser(): Promise<AuthUser | null> {
   }
 }
 
+/**
+ * Merges a partial update into the cached user record. Used after a profile
+ * edit so screens reading getStoredUser() see the change without a re-login.
+ * Does NOT touch the token or the login timestamp.
+ */
+export async function updateStoredUser(
+  patch: Partial<AuthUser>
+): Promise<AuthUser | null> {
+  const current = await getStoredUser();
+  if (!current) return null;
+  const merged = { ...current, ...patch };
+  await AsyncStorage.setItem(AUTH_USER_KEY, JSON.stringify(merged));
+  return merged;
+}
+
 export async function clearAuthData(): Promise<void> {
   await AsyncStorage.multiRemove([
     AUTH_TOKEN_KEY,
     AUTH_USER_KEY,
     AUTH_LOGIN_AT_KEY,
+    AUTH_SESSION_KIND_KEY,
   ]).catch(() => {});
 }
 
@@ -123,9 +169,13 @@ export type RefreshResult =
 let refreshInFlight: Promise<RefreshResult> | null = null;
 
 /**
- * Exchanges the current (possibly near/just-expired) token for a fresh one via
- * POST /mobile/refresh-token. Uses a raw fetch — NOT apiRequest — so it never
- * re-enters the 401 retry path. Concurrent callers share one in-flight request.
+ * Exchanges the current (possibly near/just-expired) token for a fresh one.
+ * Staff sessions use POST /mobile/refresh-token with {userId, userType};
+ * client sessions use POST /mobile/client/refresh-token with an empty body —
+ * the client route identifies the caller from the token alone.
+ *
+ * Uses a raw fetch — NOT apiRequest — so it never re-enters the 401 retry path.
+ * Concurrent callers share one in-flight request.
  *
  * Returns "auth_failed" only when the server actually rejects the token; any
  * network/parse failure returns "error" so callers don't log the user out while
@@ -136,10 +186,11 @@ export async function refreshAuthToken(): Promise<RefreshResult> {
 
   refreshInFlight = (async (): Promise<RefreshResult> => {
     try {
-      const [token, user, company] = await Promise.all([
+      const [token, user, company, kind] = await Promise.all([
         getStoredToken(),
         getStoredUser(),
         getStoredCompanyInfo(),
+        getSessionKind(),
       ]);
       if (!token || !user) return { status: "auth_failed" };
 
@@ -149,10 +200,17 @@ export async function refreshAuthToken(): Promise<RefreshResult> {
       };
       if (company?.companyCode) headers["X-Company-Code"] = company.companyCode;
 
-      const response = await fetch(`${BASE_URL}/mobile/refresh-token`, {
+      const isClient = kind === "client";
+      const endpoint = isClient
+        ? "/mobile/client/refresh-token"
+        : "/mobile/refresh-token";
+
+      const response = await fetch(`${BASE_URL}${endpoint}`, {
         method: "POST",
         headers,
-        body: JSON.stringify({ userId: user.id, userType: user.userType }),
+        body: JSON.stringify(
+          isClient ? {} : { userId: user.id, userType: user.userType }
+        ),
       });
 
       let data: any = null;
@@ -174,10 +232,15 @@ export async function refreshAuthToken(): Promise<RefreshResult> {
       if (!newToken) return { status: "error" };
 
       await AsyncStorage.setItem(AUTH_TOKEN_KEY, newToken);
-      // Persist a refreshed user object if the endpoint returns one.
-      const newUser = data?.data?.user ?? data?.user;
+      // Persist a refreshed user object if the endpoint returns one. Keep the
+      // stored userType for clients — the refresh payload may omit it, and
+      // losing it would make the app treat a client as an employee.
+      const newUser = data?.data?.user ?? data?.data?.client ?? data?.user;
       if (newUser) {
-        await AsyncStorage.setItem(AUTH_USER_KEY, JSON.stringify(newUser));
+        const merged = isClient
+          ? { ...user, ...newUser, userType: newUser.userType ?? user.userType }
+          : newUser;
+        await AsyncStorage.setItem(AUTH_USER_KEY, JSON.stringify(merged));
       }
 
       return { status: "refreshed", token: newToken };

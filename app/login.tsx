@@ -1,12 +1,15 @@
+import { ACCOUNT_TYPE_OPTIONS, identifierLabel } from "@/constants/accountTypes";
 import { useAuth } from "@/hooks/useAuth";
 import { useTheme } from "@/hooks/useTheme";
 import { CompanyInfo, getStoredCompanyInfo } from "@/services/api";
 import {
+  AccountType,
   login,
   UserType,
   validateCompanyCode,
   verifyOtp,
 } from "@/services/authService";
+import { clientLogin, verifyClientOtp } from "@/services/clientAuthService";
 import { registerFCMToken } from "@/services/notificationService";
 import { MaterialIcons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
@@ -36,7 +39,7 @@ export default function LoginScreen() {
   const [companyInfo, setCompanyInfo] = useState<CompanyInfo | null>(null);
   const [companyError, setCompanyError] = useState("");
 
-  const [userType, setUserType] = useState<UserType>("employee");
+  const [userType, setUserType] = useState<AccountType>("employee");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
@@ -48,6 +51,14 @@ export default function LoginScreen() {
   const [emailError, setEmailError] = useState("");
   const [passwordError, setPasswordError] = useState("");
   const [initialLoading, setInitialLoading] = useState(true);
+
+  // Clients sign in through /mobile/client/* with a username (which may also be
+  // an email), so the identifier field and its validation differ from staff.
+  const isClientLogin = userType === "client";
+
+  // Address the OTP was actually sent to — the client login response tells us,
+  // and it can differ from the username that was typed in.
+  const [otpTarget, setOtpTarget] = useState("");
 
   // OTP state
   const [otp, setOtp] = useState("");
@@ -65,6 +76,15 @@ export default function LoginScreen() {
       setInitialLoading(false);
     });
   }, []);
+
+  // Switching account type invalidates whatever was typed for the other one
+  // (different identifier, different endpoint), so clear the form errors.
+  const handleUserTypeChange = (value: AccountType) => {
+    if (value === userType) return;
+    setUserType(value);
+    setEmailError("");
+    setPasswordError("");
+  };
 
   const validateEmail = (value: string) => {
     return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value);
@@ -97,10 +117,13 @@ export default function LoginScreen() {
     setPasswordError("");
 
     if (!email.trim()) {
-      setEmailError("Email is required");
+      setEmailError(
+        isClientLogin ? "Username is required" : "Email is required"
+      );
       return;
     }
-    if (!validateEmail(email)) {
+    // A client identifier may be a username, so only staff get email validation.
+    if (!isClientLogin && !validateEmail(email)) {
       setEmailError("Please enter a valid email");
       return;
     }
@@ -115,9 +138,13 @@ export default function LoginScreen() {
 
     setLoading(true);
     try {
-      const data = await login(email.trim(), password, userType);
+      const data = isClientLogin
+        ? await clientLogin(email.trim(), password)
+        : await login(email.trim(), password, userType as UserType);
       console.log("Login response => ", data);
       setLoginUserId(data.userId);
+      // Clients get back the address the OTP went to; staff only echo the input.
+      setOtpTarget(("email" in data && data.email) || email.trim());
       setOtp("");
       setOtpError("");
       setStep("otp");
@@ -144,7 +171,11 @@ export default function LoginScreen() {
 
     setLoading(true);
     try {
-      await verifyOtp(loginUserId, otp, userType);
+      if (isClientLogin) {
+        await verifyClientOtp(loginUserId, otp);
+      } else {
+        await verifyOtp(loginUserId, otp, userType as UserType);
+      }
       // Load the freshly stored user into auth context BEFORE flipping isAuthed,
       // otherwise isAdmin stays false and admins get routed to employee screens.
       await refreshUser();
@@ -169,6 +200,7 @@ export default function LoginScreen() {
     setPassword("");
     setEmailError("");
     setPasswordError("");
+    setOtpTarget("");
   };
 
   const styles = StyleSheet.create({
@@ -526,48 +558,39 @@ export default function LoginScreen() {
 
       <View style={styles.formContainer}>
         <View style={styles.userTypeContainer}>
-          <Pressable
-            style={[
-              styles.userTypeOption,
-              userType === "employee" && styles.userTypeOptionActive,
-            ]}
-            onPress={() => setUserType("employee")}
-          >
-            <Text
+          {ACCOUNT_TYPE_OPTIONS.map((option) => (
+            <Pressable
+              key={option.value}
               style={[
-                styles.userTypeText,
-                userType === "employee" && styles.userTypeTextActive,
+                styles.userTypeOption,
+                userType === option.value && styles.userTypeOptionActive,
               ]}
+              onPress={() => handleUserTypeChange(option.value)}
+              disabled={loading}
             >
-              Employee
-            </Text>
-          </Pressable>
-          <Pressable
-            style={[
-              styles.userTypeOption,
-              userType === "superadmin" && styles.userTypeOptionActive,
-            ]}
-            onPress={() => setUserType("superadmin")}
-          >
-            <Text
-              style={[
-                styles.userTypeText,
-                userType === "superadmin" && styles.userTypeTextActive,
-              ]}
-            >
-              Super Admin
-            </Text>
-          </Pressable>
+              <Text
+                style={[
+                  styles.userTypeText,
+                  userType === option.value && styles.userTypeTextActive,
+                ]}
+              >
+                {option.label}
+              </Text>
+            </Pressable>
+          ))}
         </View>
 
         <View style={styles.inputGroup}>
           <Text style={styles.label}>
-            Email Address<Text style={styles.labelRequired}>*</Text>
+            {identifierLabel(userType)}
+            <Text style={styles.labelRequired}>*</Text>
           </Text>
           <View style={styles.inputWrapper}>
             <TextInput
               style={[styles.input, emailFocused && styles.inputFocused]}
-              placeholder="john.doe@example.com"
+              placeholder={
+                isClientLogin ? "username or john.doe@example.com" : "john.doe@example.com"
+              }
               placeholderTextColor={colors.input.placeholder}
               value={email}
               onChangeText={(text) => {
@@ -576,9 +599,10 @@ export default function LoginScreen() {
               }}
               onFocus={() => setEmailFocused(true)}
               onBlur={() => setEmailFocused(false)}
-              keyboardType="email-address"
+              keyboardType={isClientLogin ? "default" : "email-address"}
               editable={!loading}
               autoCapitalize="none"
+              autoCorrect={false}
             />
           </View>
           {emailError ? (
@@ -667,7 +691,7 @@ export default function LoginScreen() {
         <Text style={styles.subtitleText}>
           We've sent a verification code to{"\n"}
           <Text style={{ fontWeight: "600", color: colors.textPrimary }}>
-            {email}
+            {otpTarget || email}
           </Text>
         </Text>
       </View>
