@@ -293,6 +293,10 @@ function RootLayoutContent() {
             options={{ headerShown: false }}
           />
           <Stack.Screen
+            name="client-create-booking"
+            options={{ headerShown: false }}
+          />
+          <Stack.Screen
             name="modal"
             options={{ presentation: "modal", title: "Modal" }}
           />

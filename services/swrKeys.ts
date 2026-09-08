@@ -18,4 +18,5 @@ export const SWR_KEYS = {
   clientBookingDetail: (id: string, source: string) =>
     ["client-booking-detail", id, source] as const,
   clientProfile: () => ["client-profile"] as const,
+  clientBookingOptions: () => ["client-booking-options"] as const,
 };

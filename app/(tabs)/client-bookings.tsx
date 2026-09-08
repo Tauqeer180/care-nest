@@ -273,6 +273,17 @@ export default function ClientBookingsScreen() {
           }}
         />
       )}
+
+      <TouchableOpacity
+        activeOpacity={0.85}
+        onPress={() => router.push('/client-create-booking')}
+        style={[styles.fab, { backgroundColor: colors.primary, bottom: 24 }]}
+      >
+        <MaterialIcons name="add" size={20} color={colors.button.primaryText} />
+        <Text style={[styles.fabText, { color: colors.button.primaryText }]}>
+          New Booking
+        </Text>
+      </TouchableOpacity>
     </View>
   );
 }
@@ -397,6 +408,22 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontWeight: '500',
   },
+  fab: {
+    position: 'absolute',
+    right: 20,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    paddingHorizontal: 18,
+    paddingVertical: 14,
+    borderRadius: 28,
+    elevation: 6,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.2,
+    shadowRadius: 8,
+  },
+  fabText: { fontSize: 14, fontWeight: '700' },
   cardFooter: {
     flexDirection: 'row',
     alignItems: 'center',
