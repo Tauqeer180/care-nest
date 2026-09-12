@@ -1,4 +1,3 @@
-import MultiSelectField from "@/components/MultiSelectField";
 import SelectField from "@/components/SelectField";
 import { useTheme } from "@/hooks/useTheme";
 import {
@@ -6,20 +5,13 @@ import {
   BOOKING_TYPE_SINGLE,
   BookingDetailRow,
   BookingType,
-  BookingWeekDay,
-  createBookingRequest,
   CreateBookingPayload,
+  createBookingRequest,
   fetchBookingOptions,
   generateBookingDates,
-  isOftenTypeAllowed,
-  isRecurring,
   LabelledOption,
   OFTEN_ONE_TIME,
-  OFTEN_WEEKLY_DAYS,
-  OftenType,
-  oftenTypesFor,
   toYMD,
-  WEEK_DAY_OPTIONS,
 } from "@/services/clientBookingService";
 import { SWR_KEYS } from "@/services/swrKeys";
 import { MaterialIcons } from "@expo/vector-icons";
@@ -51,16 +43,10 @@ const FALLBACK_BOOKING_TYPES: LabelledOption[] = [
   { value: BOOKING_TYPE_SINGLE, label: "Single Date" },
   { value: BOOKING_TYPE_RANGE, label: "Date Range" },
 ];
-const FALLBACK_OFTEN_TYPES: LabelledOption[] = [
-  { value: 1, label: "One Time" },
-  { value: 2, label: "Monthly" },
-  { value: 3, label: "Weekly (Selected Days)" },
-];
-
 const DEFAULT_START_TIME = "09:00";
 const DEFAULT_END_TIME = "17:00";
 
-type DatePickerTarget = "start" | "end" | "often" | null;
+type DatePickerTarget = "start" | "end" | null;
 
 interface RowDraft {
   date: Date;
@@ -84,7 +70,7 @@ function timeToDate(time: string): Date {
 
 function dateToTime(date: Date): string {
   return `${String(date.getHours()).padStart(2, "0")}:${String(
-    date.getMinutes()
+    date.getMinutes(),
   ).padStart(2, "0")}`;
 }
 
@@ -108,15 +94,12 @@ export default function ClientCreateBookingScreen() {
 
   const { data: options, isLoading: optionsLoading } = useSWR(
     SWR_KEYS.clientBookingOptions(),
-    fetchBookingOptions
+    fetchBookingOptions,
   );
 
   const bookingTypes = options?.booking_types?.length
     ? options.booking_types
     : FALLBACK_BOOKING_TYPES;
-  const oftenTypes = options?.often_types?.length
-    ? options.often_types
-    : FALLBACK_OFTEN_TYPES;
   const maxRows = options?.max_booking_details ?? 50;
 
   // Depend on options.services itself — `?? []` would be a fresh array each
@@ -124,22 +107,18 @@ export default function ClientCreateBookingScreen() {
   const serviceOptions = useMemo(
     () =>
       (options?.services ?? []).map((s) => ({ value: s._id, label: s.title })),
-    [options?.services]
+    [options?.services],
   );
 
   // --- Step 1: schedule -----------------------------------------------------
-  const [bookingType, setBookingType] = useState<BookingType>(BOOKING_TYPE_SINGLE);
+  const [bookingType, setBookingType] =
+    useState<BookingType>(BOOKING_TYPE_SINGLE);
   const [startDate, setStartDate] = useState<Date | null>(null);
   const [endDate, setEndDate] = useState<Date | null>(null);
-  const [oftenType, setOftenType] = useState<OftenType>(OFTEN_ONE_TIME);
-  const [oftenEndDate, setOftenEndDate] = useState<Date | null>(null);
-  const [selectedWeekDays, setSelectedWeekDays] = useState<BookingWeekDay[]>([]);
   const [activePicker, setActivePicker] = useState<DatePickerTarget>(null);
 
   const [startDateError, setStartDateError] = useState("");
   const [endDateError, setEndDateError] = useState("");
-  const [oftenEndDateError, setOftenEndDateError] = useState("");
-  const [weekDaysError, setWeekDaysError] = useState("");
 
   // --- Step 2: rows ---------------------------------------------------------
   const [rows, setRows] = useState<RowDraft[]>([]);
@@ -151,12 +130,13 @@ export default function ClientCreateBookingScreen() {
   } | null>(null);
 
   const isRange = bookingType === BOOKING_TYPE_RANGE;
-  const showOftenEndDate = isRecurring(oftenType);
-  const showWeekDays = oftenType === OFTEN_WEEKLY_DAYS;
-  const oftenEndMinimum = (isRange ? endDate : null) ?? startDate ?? new Date();
 
   const fmtDisplay = (d: Date) =>
-    d.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
+    d.toLocaleDateString("en-US", {
+      month: "short",
+      day: "numeric",
+      year: "numeric",
+    });
   const fmtRowDate = (d: Date) =>
     d.toLocaleDateString("en-US", {
       weekday: "short",
@@ -169,25 +149,6 @@ export default function ClientCreateBookingScreen() {
     setBookingType(value);
     setEndDateError("");
     if (value === BOOKING_TYPE_SINGLE) setEndDate(null);
-    // "Weekly (Selected Days)" isn't offered for a range — fall back rather
-    // than leaving an option selected that the new list no longer contains.
-    if (!isOftenTypeAllowed(oftenType, value)) {
-      handleOftenTypeChange(OFTEN_ONE_TIME);
-    }
-  };
-
-  const handleOftenTypeChange = (value: OftenType) => {
-    setOftenType(value);
-    // These two only mean something for specific repeat types — clear them so
-    // they can never be submitted alongside a type they don't apply to.
-    if (!isRecurring(value)) {
-      setOftenEndDate(null);
-      setOftenEndDateError("");
-    }
-    if (value !== OFTEN_WEEKLY_DAYS) {
-      setSelectedWeekDays([]);
-      setWeekDaysError("");
-    }
   };
 
   const handleStartDateChange = (selected: Date) => {
@@ -200,8 +161,6 @@ export default function ClientCreateBookingScreen() {
     let valid = true;
     setStartDateError("");
     setEndDateError("");
-    setOftenEndDateError("");
-    setWeekDaysError("");
 
     if (!startDate) {
       setStartDateError("Start date is required");
@@ -216,18 +175,6 @@ export default function ClientCreateBookingScreen() {
         valid = false;
       }
     }
-    if (showOftenEndDate && oftenEndDate && oftenEndDate < oftenEndMinimum) {
-      setOftenEndDateError(
-        isRange
-          ? "Repeat end date must be on or after the end date"
-          : "Repeat end date must be on or after the start date"
-      );
-      valid = false;
-    }
-    if (showWeekDays && selectedWeekDays.length === 0) {
-      setWeekDaysError("Select at least one day");
-      valid = false;
-    }
     return valid;
   };
 
@@ -236,17 +183,18 @@ export default function ClientCreateBookingScreen() {
     const { dates, truncated: wasTruncated } = generateBookingDates(
       {
         bookingType,
-        oftenType,
+        oftenType: OFTEN_ONE_TIME,
         startDate: startDate!,
         endDate,
-        oftenEndDate,
-        selectedWeekDays,
+        oftenEndDate: null,
+        selectedWeekDays: [],
       },
-      maxRows
+      maxRows,
     );
 
     const previous = new Map(rows.map((row) => [toYMD(row.date), row]));
-    const onlyService = serviceOptions.length === 1 ? serviceOptions[0].value : "";
+    const onlyService =
+      serviceOptions.length === 1 ? serviceOptions[0].value : "";
 
     setRows(
       dates.map((date) => {
@@ -259,7 +207,7 @@ export default function ClientCreateBookingScreen() {
             service_id: onlyService,
           }
         );
-      })
+      }),
     );
     setTruncated(wasTruncated);
     setRowsError("");
@@ -268,7 +216,7 @@ export default function ClientCreateBookingScreen() {
 
   const updateRow = (index: number, patch: Partial<RowDraft>) => {
     setRows((current) =>
-      current.map((row, i) => (i === index ? { ...row, ...patch } : row))
+      current.map((row, i) => (i === index ? { ...row, ...patch } : row)),
     );
     setRowsError("");
   };
@@ -283,7 +231,7 @@ export default function ClientCreateBookingScreen() {
         start_time: first.start_time,
         end_time: first.end_time,
         service_id: first.service_id,
-      }))
+      })),
     );
     setRowsError("");
   };
@@ -295,15 +243,17 @@ export default function ClientCreateBookingScreen() {
     }
     const missingService = rows.findIndex((row) => !row.service_id);
     if (missingService >= 0) {
-      setRowsError(`Select a service for ${fmtRowDate(rows[missingService].date)}`);
+      setRowsError(
+        `Select a service for ${fmtRowDate(rows[missingService].date)}`,
+      );
       return false;
     }
     const badTime = rows.findIndex(
-      (row) => minutesOf(row.end_time) <= minutesOf(row.start_time)
+      (row) => minutesOf(row.end_time) <= minutesOf(row.start_time),
     );
     if (badTime >= 0) {
       setRowsError(
-        `End time must be after start time for ${fmtRowDate(rows[badTime].date)}`
+        `End time must be after start time for ${fmtRowDate(rows[badTime].date)}`,
       );
       return false;
     }
@@ -314,11 +264,8 @@ export default function ClientCreateBookingScreen() {
   const buildPayload = (): CreateBookingPayload => ({
     booking_type: bookingType,
     start_date: toYMD(startDate!),
-    ...(isRange && endDate ? { end_date: toYMD(endDate) } : {}),
-    often_type: oftenType,
-    ...(showOftenEndDate && oftenEndDate
-      ? { often_end_date: toYMD(oftenEndDate) }
-      : {}),
+    end_date: toYMD(isRange ? endDate! : startDate!),
+    often_type: OFTEN_ONE_TIME,
     booking_details: rows.map<BookingDetailRow>((row) => ({
       booking_date: toYMD(row.date),
       start_time: row.start_time,
@@ -340,11 +287,13 @@ export default function ClientCreateBookingScreen() {
       globalMutate(
         (key) => Array.isArray(key) && key[0] === "client-bookings",
         undefined,
-        { revalidate: true }
+        { revalidate: true },
       );
-      Alert.alert("Booking Requested", "Your booking request has been submitted.", [
-        { text: "OK", onPress: () => router.back() },
-      ]);
+      Alert.alert(
+        "Booking Requested",
+        "Your booking request has been submitted.",
+        [{ text: "OK", onPress: () => router.back() }],
+      );
     } catch (error: any) {
       if (error?.message === "SESSION_EXPIRED") return;
       Alert.alert("Error", error?.message || "Failed to create booking");
@@ -498,7 +447,12 @@ export default function ClientCreateBookingScreen() {
       backgroundColor: colors.primary + "18",
     },
     rowIndexText: { fontSize: 11, fontWeight: "700", color: colors.primary },
-    rowDate: { flex: 1, fontSize: 14, fontWeight: "700", color: colors.textPrimary },
+    rowDate: {
+      flex: 1,
+      fontSize: 14,
+      fontWeight: "700",
+      color: colors.textPrimary,
+    },
     timeRow: { flexDirection: "row", gap: 12 },
     timeCol: { flex: 1 },
     footer: {
@@ -544,7 +498,7 @@ export default function ClientCreateBookingScreen() {
     value: Date | null,
     target: Exclude<DatePickerTarget, null>,
     error: string,
-    opts: { required?: boolean; hint?: string; onClear?: () => void } = {}
+    opts: { required?: boolean; hint?: string; onClear?: () => void } = {},
   ) => {
     const { required = true, hint, onClear } = opts;
     return (
@@ -575,7 +529,11 @@ export default function ClientCreateBookingScreen() {
           </Text>
           {value && onClear ? (
             <TouchableOpacity onPress={onClear} hitSlop={8}>
-              <MaterialIcons name="close" size={18} color={colors.textTertiary} />
+              <MaterialIcons
+                name="close"
+                size={18}
+                color={colors.textTertiary}
+              />
             </TouchableOpacity>
           ) : (
             <MaterialIcons
@@ -594,7 +552,9 @@ export default function ClientCreateBookingScreen() {
   const renderScheduleStep = () => (
     <>
       <Text style={styles.sectionTitle}>Schedule</Text>
-      <Text style={styles.sectionSubtitle}>Choose when you need the service.</Text>
+      <Text style={styles.sectionSubtitle}>
+        Choose when you need the service.
+      </Text>
 
       <SelectField<number>
         label="Select Type"
@@ -607,43 +567,8 @@ export default function ClientCreateBookingScreen() {
 
       {renderDateField("Start Date", startDate, "start", startDateError)}
 
-      {isRange ? renderDateField("End Date", endDate, "end", endDateError) : null}
-
-      <SelectField<number>
-        label="Repeats"
-        question="How often would you like service?"
-        value={oftenType}
-        options={oftenTypesFor(oftenTypes, bookingType)}
-        onChange={(value) => handleOftenTypeChange(value as OftenType)}
-        required
-      />
-
-      {showWeekDays ? (
-        <MultiSelectField<BookingWeekDay>
-          label="Days of the Week"
-          question="Which days would you like service?"
-          value={selectedWeekDays}
-          options={WEEK_DAY_OPTIONS}
-          onChange={(days) => {
-            setSelectedWeekDays(days);
-            setWeekDaysError("");
-          }}
-          placeholder="Select days"
-          hint="Pick one or more days."
-          error={weekDaysError}
-          required
-        />
-      ) : null}
-
-      {showOftenEndDate
-        ? renderDateField("Repeat Until", oftenEndDate, "often", oftenEndDateError, {
-            required: false,
-            hint: `Leave empty to generate up to ${maxRows} dates.`,
-            onClear: () => {
-              setOftenEndDate(null);
-              setOftenEndDateError("");
-            },
-          })
+      {isRange
+        ? renderDateField("End Date", endDate, "end", endDateError)
         : null}
     </>
   );
@@ -656,7 +581,11 @@ export default function ClientCreateBookingScreen() {
         </View>
         {/* Date is derived from the schedule — read-only here. */}
         <Text style={styles.rowDate}>{fmtRowDate(row.date)}</Text>
-        <MaterialIcons name="lock-outline" size={15} color={colors.textTertiary} />
+        <MaterialIcons
+          name="lock-outline"
+          size={15}
+          color={colors.textTertiary}
+        />
       </View>
 
       <View style={styles.timeRow}>
@@ -670,7 +599,11 @@ export default function ClientCreateBookingScreen() {
             <Text style={[styles.dateFieldText, { color: colors.input.text }]}>
               {formatTimeLabel(row.start_time)}
             </Text>
-            <MaterialIcons name="schedule" size={18} color={colors.textTertiary} />
+            <MaterialIcons
+              name="schedule"
+              size={18}
+              color={colors.textTertiary}
+            />
           </TouchableOpacity>
         </View>
         <View style={styles.timeCol}>
@@ -683,7 +616,11 @@ export default function ClientCreateBookingScreen() {
             <Text style={[styles.dateFieldText, { color: colors.input.text }]}>
               {formatTimeLabel(row.end_time)}
             </Text>
-            <MaterialIcons name="schedule" size={18} color={colors.textTertiary} />
+            <MaterialIcons
+              name="schedule"
+              size={18}
+              color={colors.textTertiary}
+            />
           </TouchableOpacity>
         </View>
       </View>
@@ -723,17 +660,22 @@ export default function ClientCreateBookingScreen() {
           <View style={styles.summaryCard}>
             <MaterialIcons name="event-note" size={20} color={colors.primary} />
             <Text style={styles.summaryText}>
-              {rows.length} {rows.length === 1 ? "date" : "dates"} generated from
-              your schedule.
+              {rows.length} {rows.length === 1 ? "date" : "dates"} generated
+              from your schedule.
             </Text>
           </View>
 
           {truncated ? (
             <View style={styles.warnCard}>
-              <MaterialIcons name="info-outline" size={18} color={colors.warning} />
+              <MaterialIcons
+                name="info-outline"
+                size={18}
+                color={colors.warning}
+              />
               <Text style={styles.warnText}>
-                Stopped at the {maxRows}-date limit. Set a &quot;Repeat Until&quot;
-                date or a shorter range to control which dates are included.
+                Stopped at the {maxRows}-date limit. Set a &quot;Repeat
+                Until&quot; date or a shorter range to control which dates are
+                included.
               </Text>
             </View>
           ) : null}
@@ -744,7 +686,11 @@ export default function ClientCreateBookingScreen() {
               onPress={applyFirstRowToAll}
               activeOpacity={0.8}
             >
-              <MaterialIcons name="content-copy" size={16} color={colors.primary} />
+              <MaterialIcons
+                name="content-copy"
+                size={16}
+                color={colors.primary}
+              />
               <Text style={styles.applyAllText}>
                 Apply first row&apos;s time &amp; service to all
               </Text>
@@ -755,7 +701,9 @@ export default function ClientCreateBookingScreen() {
       renderItem={({ item, index }) => renderRow(item, index)}
       ListFooterComponent={
         rowsError ? (
-          <Text style={[styles.errorText, { marginBottom: 8 }]}>{rowsError}</Text>
+          <Text style={[styles.errorText, { marginBottom: 8 }]}>
+            {rowsError}
+          </Text>
         ) : null
       }
     />
@@ -858,7 +806,10 @@ export default function ClientCreateBookingScreen() {
             activeOpacity={0.85}
           >
             {submitting ? (
-              <ActivityIndicator size="small" color={colors.button.primaryText} />
+              <ActivityIndicator
+                size="small"
+                color={colors.button.primaryText}
+              />
             ) : (
               <Text style={styles.primaryButtonText}>
                 {stepIndex === STEPS.length - 1 ? "Create Booking" : "Next"}
@@ -901,26 +852,11 @@ export default function ClientCreateBookingScreen() {
           }}
         />
       )}
-      {activePicker === "often" && (
-        <DateTimePicker
-          value={oftenEndDate ?? oftenEndMinimum}
-          mode="date"
-          display={Platform.OS === "ios" ? "inline" : "default"}
-          minimumDate={oftenEndMinimum}
-          onChange={(event, selected) => {
-            setActivePicker(Platform.OS === "ios" ? "often" : null);
-            if (event.type === "set" && selected) {
-              setOftenEndDate(selected);
-              setOftenEndDateError("");
-              if (Platform.OS === "ios") setActivePicker(null);
-            }
-            if (event.type === "dismissed") setActivePicker(null);
-          }}
-        />
-      )}
       {timePicker && (
         <DateTimePicker
-          value={timeToDate(rows[timePicker.index]?.[timePicker.field] ?? "09:00")}
+          value={timeToDate(
+            rows[timePicker.index]?.[timePicker.field] ?? "09:00",
+          )}
           mode="time"
           is24Hour={false}
           display={Platform.OS === "ios" ? "spinner" : "default"}

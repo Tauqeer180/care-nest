@@ -1,76 +1,84 @@
-import { useTheme } from '@/hooks/useTheme';
+import { useTheme } from "@/hooks/useTheme";
 import {
   BOOKING_SOURCE_LABELS,
   BookingSource,
+  deleteClientBookingRequest,
   employeeName,
   employeePhone,
   fetchClientBookingDetail,
-} from '@/services/clientBookingService';
-import { SWR_KEYS } from '@/services/swrKeys';
-import { MaterialIcons } from '@expo/vector-icons';
-import { useLocalSearchParams, useRouter } from 'expo-router';
-import { useEffect } from 'react';
+} from "@/services/clientBookingService";
+import { SWR_KEYS } from "@/services/swrKeys";
+import { MaterialIcons } from "@expo/vector-icons";
+import { useLocalSearchParams, useRouter } from "expo-router";
+import { useEffect, useState } from "react";
 import {
   ActivityIndicator,
+  Alert,
   ScrollView,
   StyleSheet,
   Text,
   TouchableOpacity,
   View,
-} from 'react-native';
-import useSWR from 'swr';
+} from "react-native";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
+import useSWR, { mutate as globalMutate } from "swr";
 
 export default function ClientBookingDetailScreen() {
-  const { id, source } = useLocalSearchParams<{ id: string; source: BookingSource }>();
+  const { id, source } = useLocalSearchParams<{
+    id: string;
+    source: BookingSource;
+  }>();
   const { colors } = useTheme();
   const router = useRouter();
+  const insets = useSafeAreaInsets();
+  const [deleting, setDeleting] = useState(false);
 
   const { data, error, isLoading } = useSWR(
     id && source ? SWR_KEYS.clientBookingDetail(id, source) : null,
     () => fetchClientBookingDetail(id!, source!),
-    { revalidateOnFocus: true }
+    { revalidateOnFocus: true },
   );
   const booking = data?.data ?? null;
 
   useEffect(() => {
     if (data) {
-      console.log('Client booking detail =>', JSON.stringify(data, null, 2));
+      console.log("Client booking detail =>", JSON.stringify(data, null, 2));
     }
   }, [data]);
 
   const formatDate = (dateStr?: string | null) => {
-    if (!dateStr) return '';
+    if (!dateStr) return "";
     const date = new Date(dateStr);
     if (Number.isNaN(date.getTime())) return dateStr;
-    return date.toLocaleDateString('en-US', {
-      weekday: 'short',
-      month: 'short',
-      day: 'numeric',
-      year: 'numeric',
+    return date.toLocaleDateString("en-US", {
+      weekday: "short",
+      month: "short",
+      day: "numeric",
+      year: "numeric",
     });
   };
 
   const formatDateTime = (dateStr?: string | null) => {
-    if (!dateStr) return '';
+    if (!dateStr) return "";
     const date = new Date(dateStr);
     if (Number.isNaN(date.getTime())) return dateStr;
-    return date.toLocaleString('en-US', {
-      month: 'short',
-      day: 'numeric',
-      year: 'numeric',
-      hour: '2-digit',
-      minute: '2-digit',
+    return date.toLocaleString("en-US", {
+      month: "short",
+      day: "numeric",
+      year: "numeric",
+      hour: "2-digit",
+      minute: "2-digit",
     });
   };
 
   const formatTime = (time?: string | null) => {
-    if (!time) return '';
-    const [h, m] = time.split(':');
+    if (!time) return "";
+    const [h, m] = time.split(":");
     const hour = parseInt(h, 10);
     if (Number.isNaN(hour)) return time;
-    const suffix = hour >= 12 ? 'PM' : 'AM';
+    const suffix = hour >= 12 ? "PM" : "AM";
     const display = hour > 12 ? hour - 12 : hour === 0 ? 12 : hour;
-    return `${display}:${m ?? '00'} ${suffix}`;
+    return `${display}:${m ?? "00"} ${suffix}`;
   };
 
   /** Renders a labelled row, or nothing when the field is absent for this source. */
@@ -88,8 +96,12 @@ export default function ClientBookingDetailScreen() {
       <View style={styles.infoRow}>
         <MaterialIcons name={icon} size={18} color={colors.textTertiary} />
         <View style={styles.infoTextWrap}>
-          <Text style={[styles.infoLabel, { color: colors.textTertiary }]}>{label}</Text>
-          <Text style={[styles.infoValue, { color: colors.textPrimary }]}>{value}</Text>
+          <Text style={[styles.infoLabel, { color: colors.textTertiary }]}>
+            {label}
+          </Text>
+          <Text style={[styles.infoValue, { color: colors.textPrimary }]}>
+            {value}
+          </Text>
         </View>
       </View>
     );
@@ -108,7 +120,7 @@ export default function ClientBookingDetailScreen() {
       <View style={[styles.centered, { backgroundColor: colors.background }]}>
         <MaterialIcons name="error-outline" size={48} color={colors.error} />
         <Text style={[styles.errorText, { color: colors.textSecondary }]}>
-          {error?.message ?? 'Booking not found'}
+          {error?.message ?? "Booking not found"}
         </Text>
         <TouchableOpacity
           onPress={() => router.back()}
@@ -126,13 +138,58 @@ export default function ClientBookingDetailScreen() {
   const startDate = formatDate(booking.booking_date);
   const times = [formatTime(booking.start_time), formatTime(booking.end_time)]
     .filter(Boolean)
-    .join(' - ');
-  const shifts = Array.isArray(booking.booking_details) ? booking.booking_details : [];
+    .join(" - ");
+  const shifts = Array.isArray(booking.booking_details)
+    ? booking.booking_details
+    : [];
+  const canDelete =
+    booking.source === "request" &&
+    !(booking.stage_label ?? "").toLowerCase().includes("approved");
+
+  const handleDelete = () => {
+    if (!id || !canDelete) return;
+    Alert.alert(
+      "Delete Booking Request",
+      "Are you sure you want to delete this booking request?",
+      [
+        { text: "Cancel", style: "cancel" },
+        {
+          text: "Delete",
+          style: "destructive",
+          onPress: async () => {
+            setDeleting(true);
+            try {
+              const response = await deleteClientBookingRequest(id);
+              globalMutate(
+                (key) => Array.isArray(key) && key[0] === "client-bookings",
+              );
+              Alert.alert(
+                "Success",
+                response.message ?? "Booking request deleted.",
+                [{ text: "OK", onPress: () => router.back() }],
+              );
+            } catch (err: any) {
+              if (err.message === "SESSION_EXPIRED") return;
+              Alert.alert(
+                "Error",
+                err.message ?? "Failed to delete booking request",
+              );
+            } finally {
+              setDeleting(false);
+            }
+          },
+        },
+      ],
+    );
+  };
 
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>
       <View style={[styles.header, { backgroundColor: colors.primary }]}>
-        <TouchableOpacity onPress={() => router.back()} style={styles.headerBack}>
+        <TouchableOpacity
+          onPress={() => router.back()}
+          style={styles.headerBack}
+        >
           <MaterialIcons name="arrow-back" size={24} color="white" />
         </TouchableOpacity>
         <Text style={styles.headerTitle} numberOfLines={1}>
@@ -141,14 +198,25 @@ export default function ClientBookingDetailScreen() {
         <View style={{ width: 24 }} />
       </View>
 
-      <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
+      <ScrollView
+        style={styles.content}
+        contentContainerStyle={canDelete ? styles.contentWithAction : undefined}
+        showsVerticalScrollIndicator={false}
+      >
         {/* Summary */}
-        <View style={[styles.card, { backgroundColor: colors.card.background }]}>
+        <View
+          style={[styles.card, { backgroundColor: colors.card.background }]}
+        >
           <View style={styles.titleRow}>
             <Text style={[styles.title, { color: colors.textPrimary }]}>
-              {booking.service_title || 'Service'}
+              {booking.service_title || "Service"}
             </Text>
-            <View style={[styles.sourceBadge, { backgroundColor: colors.info + '15' }]}>
+            <View
+              style={[
+                styles.sourceBadge,
+                { backgroundColor: colors.info + "15" },
+              ]}
+            >
               <Text style={[styles.sourceBadgeText, { color: colors.info }]}>
                 {BOOKING_SOURCE_LABELS[booking.source] ?? source}
               </Text>
@@ -156,7 +224,12 @@ export default function ClientBookingDetailScreen() {
           </View>
 
           {booking.stage_label ? (
-            <View style={[styles.stageChip, { backgroundColor: colors.primary + '15' }]}>
+            <View
+              style={[
+                styles.stageChip,
+                { backgroundColor: colors.primary + "15" },
+              ]}
+            >
               <MaterialIcons name="flag" size={14} color={colors.primary} />
               <Text style={[styles.stageText, { color: colors.primary }]}>
                 {booking.stage_label}
@@ -166,8 +239,12 @@ export default function ClientBookingDetailScreen() {
         </View>
 
         {/* Schedule */}
-        <View style={[styles.card, { backgroundColor: colors.card.background }]}>
-          <Text style={[styles.sectionTitle, { color: colors.textPrimary }]}>Schedule</Text>
+        <View
+          style={[styles.card, { backgroundColor: colors.card.background }]}
+        >
+          <Text style={[styles.sectionTitle, { color: colors.textPrimary }]}>
+            Schedule
+          </Text>
           <InfoRow icon="calendar-today" label="Date" value={startDate} />
           {endDate && endDate !== startDate ? (
             <InfoRow icon="event" label="End Date" value={endDate} />
@@ -182,17 +259,31 @@ export default function ClientBookingDetailScreen() {
 
         {/* Location — present on pool and booking sources */}
         {booking.floor_name || booking.location || booking.address ? (
-          <View style={[styles.card, { backgroundColor: colors.card.background }]}>
-            <Text style={[styles.sectionTitle, { color: colors.textPrimary }]}>Location</Text>
-            <InfoRow icon="apartment" label="Floor" value={booking.floor_name} />
-            <InfoRow icon="location-pin" label="Location" value={booking.location} />
+          <View
+            style={[styles.card, { backgroundColor: colors.card.background }]}
+          >
+            <Text style={[styles.sectionTitle, { color: colors.textPrimary }]}>
+              Location
+            </Text>
+            <InfoRow
+              icon="apartment"
+              label="Floor"
+              value={booking.floor_name}
+            />
+            <InfoRow
+              icon="location-pin"
+              label="Location"
+              value={booking.location}
+            />
             <InfoRow icon="home" label="Address" value={booking.address} />
           </View>
         ) : null}
 
         {/* Assigned staff */}
         {staffName ? (
-          <View style={[styles.card, { backgroundColor: colors.card.background }]}>
+          <View
+            style={[styles.card, { backgroundColor: colors.card.background }]}
+          >
             <Text style={[styles.sectionTitle, { color: colors.textPrimary }]}>
               Assigned Caregiver
             </Text>
@@ -201,21 +292,30 @@ export default function ClientBookingDetailScreen() {
             <InfoRow
               icon="email"
               label="Email"
-              value={typeof booking.employee === 'object' ? booking.employee?.email : null}
+              value={
+                typeof booking.employee === "object"
+                  ? booking.employee?.email
+                  : null
+              }
             />
           </View>
         ) : null}
 
         {/* Per-shift breakdown — source=request only */}
         {shifts.length > 0 ? (
-          <View style={[styles.card, { backgroundColor: colors.card.background }]}>
+          <View
+            style={[styles.card, { backgroundColor: colors.card.background }]}
+          >
             <Text style={[styles.sectionTitle, { color: colors.textPrimary }]}>
               Shifts ({shifts.length})
             </Text>
             {shifts.map((shift, index) => {
-              const shiftTimes = [formatTime(shift.start_time), formatTime(shift.end_time)]
+              const shiftTimes = [
+                formatTime(shift.start_time),
+                formatTime(shift.end_time),
+              ]
                 .filter(Boolean)
-                .join(' - ');
+                .join(" - ");
               return (
                 <View
                   key={shift._id ?? index}
@@ -227,11 +327,19 @@ export default function ClientBookingDetailScreen() {
                     },
                   ]}
                 >
-                  <Text style={[styles.shiftDate, { color: colors.textPrimary }]}>
-                    {formatDate(shift.booking_date ?? shift.date) || `Shift ${index + 1}`}
+                  <Text
+                    style={[styles.shiftDate, { color: colors.textPrimary }]}
+                  >
+                    {formatDate(shift.booking_date ?? shift.date) ||
+                      `Shift ${index + 1}`}
                   </Text>
                   {shiftTimes ? (
-                    <Text style={[styles.shiftTime, { color: colors.textSecondary }]}>
+                    <Text
+                      style={[
+                        styles.shiftTime,
+                        { color: colors.textSecondary },
+                      ]}
+                    >
                       {shiftTimes}
                     </Text>
                   ) : null}
@@ -243,14 +351,48 @@ export default function ClientBookingDetailScreen() {
 
         {/* Notes */}
         {booking.notes ? (
-          <View style={[styles.card, { backgroundColor: colors.card.background }]}>
-            <Text style={[styles.sectionTitle, { color: colors.textPrimary }]}>Notes</Text>
-            <Text style={[styles.notes, { color: colors.textSecondary }]}>{booking.notes}</Text>
+          <View
+            style={[styles.card, { backgroundColor: colors.card.background }]}
+          >
+            <Text style={[styles.sectionTitle, { color: colors.textPrimary }]}>
+              Notes
+            </Text>
+            <Text style={[styles.notes, { color: colors.textSecondary }]}>
+              {booking.notes}
+            </Text>
           </View>
         ) : null}
 
         <View style={{ height: 32 }} />
       </ScrollView>
+
+      {canDelete ? (
+        <View
+          style={[
+            styles.bottomBar,
+            {
+              backgroundColor: colors.background,
+              borderTopColor: colors.border,
+              paddingBottom: 12 + insets.bottom,
+            },
+          ]}
+        >
+          <TouchableOpacity
+            style={[styles.deleteButton, { borderColor: colors.error }]}
+            activeOpacity={0.8}
+            onPress={handleDelete}
+            disabled={deleting}
+          >
+            {deleting ? (
+              <ActivityIndicator size="small" color={colors.error} />
+            ) : (
+              <Text style={[styles.deleteButtonText, { color: colors.error }]}>
+                Delete Request
+              </Text>
+            )}
+          </TouchableOpacity>
+        </View>
+      ) : null}
     </View>
   );
 }
@@ -259,23 +401,23 @@ const styles = StyleSheet.create({
   container: { flex: 1 },
   centered: {
     flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
+    justifyContent: "center",
+    alignItems: "center",
     gap: 12,
     padding: 24,
   },
-  errorText: { fontSize: 15, textAlign: 'center' },
+  errorText: { fontSize: 15, textAlign: "center" },
   backBtn: {
     paddingHorizontal: 20,
     paddingVertical: 10,
     borderRadius: 10,
     marginTop: 8,
   },
-  backBtnText: { color: 'white', fontSize: 14, fontWeight: '600' },
+  backBtnText: { color: "white", fontSize: 14, fontWeight: "600" },
   header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
     paddingTop: 60,
     paddingHorizontal: 20,
     paddingBottom: 20,
@@ -283,54 +425,77 @@ const styles = StyleSheet.create({
   headerBack: { padding: 4 },
   headerTitle: {
     flex: 1,
-    textAlign: 'center',
+    textAlign: "center",
     fontSize: 18,
-    fontWeight: '700',
-    color: 'white',
+    fontWeight: "700",
+    color: "white",
   },
   content: { flex: 1, paddingHorizontal: 20, paddingTop: 16 },
+  contentWithAction: { paddingBottom: 120 },
   card: {
     borderRadius: 16,
     padding: 16,
     marginBottom: 16,
-    shadowColor: '#000',
+    shadowColor: "#000",
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.08,
     shadowRadius: 12,
     elevation: 3,
   },
   titleRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'flex-start',
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "flex-start",
     gap: 12,
   },
-  title: { flex: 1, fontSize: 18, fontWeight: '700' },
+  title: { flex: 1, fontSize: 18, fontWeight: "700" },
   sourceBadge: { paddingHorizontal: 10, paddingVertical: 6, borderRadius: 10 },
-  sourceBadgeText: { fontSize: 12, fontWeight: '700' },
+  sourceBadgeText: { fontSize: 12, fontWeight: "700" },
   stageChip: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    alignSelf: 'flex-start',
+    flexDirection: "row",
+    alignItems: "center",
+    alignSelf: "flex-start",
     gap: 4,
     paddingHorizontal: 10,
     paddingVertical: 6,
     borderRadius: 12,
     marginTop: 10,
   },
-  stageText: { fontSize: 12, fontWeight: '700' },
-  sectionTitle: { fontSize: 15, fontWeight: '700', marginBottom: 12 },
-  infoRow: { flexDirection: 'row', alignItems: 'flex-start', gap: 12, marginBottom: 12 },
+  stageText: { fontSize: 12, fontWeight: "700" },
+  sectionTitle: { fontSize: 15, fontWeight: "700", marginBottom: 12 },
+  infoRow: {
+    flexDirection: "row",
+    alignItems: "flex-start",
+    gap: 12,
+    marginBottom: 12,
+  },
   infoTextWrap: { flex: 1 },
-  infoLabel: { fontSize: 11, fontWeight: '600', marginBottom: 2 },
-  infoValue: { fontSize: 14, fontWeight: '500' },
+  infoLabel: { fontSize: 11, fontWeight: "600", marginBottom: 2 },
+  infoValue: { fontSize: 14, fontWeight: "500" },
   shiftRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
     paddingVertical: 10,
   },
-  shiftDate: { fontSize: 13, fontWeight: '600' },
-  shiftTime: { fontSize: 13, fontWeight: '500' },
+  shiftDate: { fontSize: 13, fontWeight: "600" },
+  shiftTime: { fontSize: 13, fontWeight: "500" },
   notes: { fontSize: 14, lineHeight: 20 },
+  bottomBar: {
+    position: "absolute",
+    bottom: 0,
+    left: 0,
+    right: 0,
+    paddingHorizontal: 20,
+    paddingTop: 12,
+    paddingBottom: 12,
+    borderTopWidth: 1,
+  },
+  deleteButton: {
+    paddingVertical: 14,
+    borderRadius: 12,
+    alignItems: "center",
+    borderWidth: 1,
+  },
+  deleteButtonText: { fontSize: 16, fontWeight: "700" },
 });

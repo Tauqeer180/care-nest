@@ -1,21 +1,32 @@
-import { StyleSheet, ScrollView, View, Text, TouchableOpacity, ActivityIndicator } from 'react-native';
-import { useLocalSearchParams, useRouter } from 'expo-router';
-import { useEffect } from 'react';
-import { useTheme } from '@/hooks/useTheme';
-import { Feather, MaterialIcons } from '@expo/vector-icons';
-import useSWR from 'swr';
-import { fetchMyJobDetail } from '@/services/jobPoolService';
-import { SWR_KEYS } from '@/services/swrKeys';
+import { useTheme } from "@/hooks/useTheme";
+import { fetchMyJobDetail, releaseMyJob } from "@/services/jobPoolService";
+import { SWR_KEYS } from "@/services/swrKeys";
+import { Feather, MaterialIcons } from "@expo/vector-icons";
+import { useLocalSearchParams, useRouter } from "expo-router";
+import { useEffect, useState } from "react";
+import {
+  ActivityIndicator,
+  Alert,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View,
+} from "react-native";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
+import useSWR, { mutate as globalMutate } from "swr";
 
 export default function MyJobDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const { colors } = useTheme();
   const router = useRouter();
+  const insets = useSafeAreaInsets();
+  const [releasing, setReleasing] = useState(false);
 
   const { data, error, isLoading } = useSWR(
     id ? SWR_KEYS.myJobDetail(id) : null,
     () => fetchMyJobDetail(id!),
-    { revalidateOnFocus: true }
+    { revalidateOnFocus: true },
   );
   const job = data?.data ?? null;
   const loading = isLoading;
@@ -28,31 +39,36 @@ export default function MyJobDetailScreen() {
 
   const formatDate = (dateStr: string) => {
     const date = new Date(dateStr);
-    return date.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' });
+    return date.toLocaleDateString("en-US", {
+      weekday: "short",
+      month: "short",
+      day: "numeric",
+      year: "numeric",
+    });
   };
 
   const formatDateTime = (dateStr: string) => {
     const date = new Date(dateStr);
-    return date.toLocaleString('en-US', {
-      month: 'short',
-      day: 'numeric',
-      year: 'numeric',
-      hour: '2-digit',
-      minute: '2-digit',
+    return date.toLocaleString("en-US", {
+      month: "short",
+      day: "numeric",
+      year: "numeric",
+      hour: "2-digit",
+      minute: "2-digit",
     });
   };
 
   const formatTime = (time: string) => {
-    const [h, m] = time.split(':');
+    const [h, m] = time.split(":");
     const hour = parseInt(h, 10);
-    const suffix = hour >= 12 ? 'PM' : 'AM';
+    const suffix = hour >= 12 ? "PM" : "AM";
     const display = hour > 12 ? hour - 12 : hour === 0 ? 12 : hour;
     return `${display}:${m} ${suffix}`;
   };
 
   const calculateShiftHours = (start: string, end: string): number => {
-    const [sh, sm] = start.split(':').map(Number);
-    const [eh, em] = end.split(':').map(Number);
+    const [sh, sm] = start.split(":").map(Number);
+    const [eh, em] = end.split(":").map(Number);
     let startMinutes = sh * 60 + sm;
     let endMinutes = eh * 60 + em;
     if (endMinutes <= startMinutes) endMinutes += 24 * 60;
@@ -64,7 +80,7 @@ export default function MyJobDetailScreen() {
     const minutes = Math.floor(diff / 60000);
     const hours = Math.floor(minutes / 60);
     const days = Math.floor(hours / 24);
-    if (minutes < 1) return 'just now';
+    if (minutes < 1) return "just now";
     if (minutes < 60) return `${minutes}m ago`;
     if (hours < 24) return `${hours}h ago`;
     if (days < 30) return `${days}d ago`;
@@ -75,16 +91,56 @@ export default function MyJobDetailScreen() {
   const getStatusInfo = (status: number) => {
     switch (status) {
       case 1:
-        return { label: 'Open', color: colors.success };
+        return { label: "Open", color: colors.success };
       case 2:
-        return { label: 'Filled', color: colors.warning };
+        return { label: "Filled", color: colors.warning };
       case 3:
-        return { label: 'Cancelled', color: colors.error };
+        return { label: "Cancelled", color: colors.error };
       case 4:
-        return { label: 'Pending Approval', color: colors.info };
+        return { label: "Pending Approval", color: colors.info };
       default:
-        return { label: 'Unknown', color: colors.textTertiary };
+        return { label: "Unknown", color: colors.textTertiary };
     }
+  };
+
+  const handleRelease = () => {
+    if (!id) return;
+    Alert.alert(
+      "Release Job",
+      "Are you sure you want to release this job? It will become available for another employee to accept.",
+      [
+        { text: "Cancel", style: "cancel" },
+        {
+          text: "Release",
+          style: "destructive",
+          onPress: async () => {
+            setReleasing(true);
+            try {
+              const response = await releaseMyJob(id);
+              console.log(
+                "Release My Job Response:",
+                JSON.stringify(response, null, 2),
+              );
+              globalMutate(
+                (key) =>
+                  Array.isArray(key) &&
+                  (key[0] === "my-jobs" || key[0] === "job-pool"),
+              );
+              Alert.alert(
+                "Success",
+                response.message ?? "Job released successfully.",
+                [{ text: "OK", onPress: () => router.back() }],
+              );
+            } catch (err: any) {
+              if (err.message === "SESSION_EXPIRED") return;
+              Alert.alert("Error", err.message ?? "Failed to release job");
+            } finally {
+              setReleasing(false);
+            }
+          },
+        },
+      ],
+    );
   };
 
   if (loading) {
@@ -99,8 +155,13 @@ export default function MyJobDetailScreen() {
     return (
       <View style={[styles.centered, { backgroundColor: colors.background }]}>
         <MaterialIcons name="error-outline" size={48} color={colors.error} />
-        <Text style={[styles.errorText, { color: colors.textSecondary }]}>{error?.message ?? 'Job not found'}</Text>
-        <TouchableOpacity onPress={() => router.back()} style={[styles.backBtn, { backgroundColor: colors.primary }]}>
+        <Text style={[styles.errorText, { color: colors.textSecondary }]}>
+          {error?.message ?? "Job not found"}
+        </Text>
+        <TouchableOpacity
+          onPress={() => router.back()}
+          style={[styles.backBtn, { backgroundColor: colors.primary }]}
+        >
           <Text style={styles.backBtnText}>Go Back</Text>
         </TouchableOpacity>
       </View>
@@ -111,32 +172,63 @@ export default function MyJobDetailScreen() {
     <View style={[styles.container, { backgroundColor: colors.background }]}>
       {/* Header */}
       <View style={[styles.header, { backgroundColor: colors.primary }]}>
-        <TouchableOpacity onPress={() => router.back()} style={styles.headerBack}>
+        <TouchableOpacity
+          onPress={() => router.back()}
+          style={styles.headerBack}
+        >
           <MaterialIcons name="arrow-back" size={24} color="white" />
         </TouchableOpacity>
-        <Text style={styles.headerTitle} numberOfLines={1}>My Job Details</Text>
+        <Text style={styles.headerTitle} numberOfLines={1}>
+          My Job Details
+        </Text>
         <View style={{ width: 24 }} />
       </View>
 
-      <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
+      <ScrollView
+        style={styles.content}
+        contentContainerStyle={styles.contentContainer}
+        showsVerticalScrollIndicator={false}
+      >
         {/* Title & Pay */}
-        <View style={[styles.card, { backgroundColor: colors.card.background }]}>
+        <View
+          style={[styles.card, { backgroundColor: colors.card.background }]}
+        >
           <View style={styles.titleRow}>
-            <Text style={[styles.jobTitle, { color: colors.textPrimary }]}>{job.title}</Text>
+            <Text style={[styles.jobTitle, { color: colors.textPrimary }]}>
+              {job.title}
+            </Text>
             {(() => {
               const status = getStatusInfo(job.status);
               return (
-                <View style={[styles.statusBadge, { backgroundColor: status.color + '15' }]}>
-                  <View style={[styles.statusDot, { backgroundColor: status.color }]} />
-                  <Text style={[styles.statusText, { color: status.color }]}>{status.label}</Text>
+                <View
+                  style={[
+                    styles.statusBadge,
+                    { backgroundColor: status.color + "15" },
+                  ]}
+                >
+                  <View
+                    style={[
+                      styles.statusDot,
+                      { backgroundColor: status.color },
+                    ]}
+                  />
+                  <Text style={[styles.statusText, { color: status.color }]}>
+                    {status.label}
+                  </Text>
                 </View>
               );
             })()}
           </View>
           {job.posted_by_name ? (
             <View style={styles.postedRow}>
-              <MaterialIcons name="person" size={16} color={colors.textTertiary} />
-              <Text style={[styles.postedBy, { color: colors.textSecondary }]}>Posted by {job.posted_by_name}</Text>
+              <MaterialIcons
+                name="person"
+                size={16}
+                color={colors.textTertiary}
+              />
+              <Text style={[styles.postedBy, { color: colors.textSecondary }]}>
+                Posted by {job.posted_by_name}
+              </Text>
             </View>
           ) : null}
           <View style={styles.postedRow}>
@@ -145,7 +237,9 @@ export default function MyJobDetailScreen() {
               Posted {formatRelativeTime(job.created_date)}
             </Text>
           </View>
-          <View style={[styles.payChip, { backgroundColor: colors.success + '15' }]}>
+          <View
+            style={[styles.payChip, { backgroundColor: colors.success + "15" }]}
+          >
             <Text style={[styles.payRate, { color: colors.success }]}>
               ${job.pay_rate ?? job.rate_used ?? 0}/hr
             </Text>
@@ -154,27 +248,65 @@ export default function MyJobDetailScreen() {
 
         {/* Acceptance Details */}
         {job.accepted_by_name || job.accepted_at ? (
-          <View style={[styles.acceptedCard, { backgroundColor: colors.success + '12', borderColor: colors.success + '40' }]}>
+          <View
+            style={[
+              styles.acceptedCard,
+              {
+                backgroundColor: colors.success + "12",
+                borderColor: colors.success + "40",
+              },
+            ]}
+          >
             <View style={styles.acceptedHeader}>
-              <MaterialIcons name="check-circle" size={20} color={colors.success} />
-              <Text style={[styles.sectionTitle, { color: colors.success, marginBottom: 0 }]}>You Accepted This Job</Text>
+              <MaterialIcons
+                name="check-circle"
+                size={20}
+                color={colors.success}
+              />
+              <Text
+                style={[
+                  styles.sectionTitle,
+                  { color: colors.success, marginBottom: 0 },
+                ]}
+              >
+                You Accepted This Job
+              </Text>
             </View>
             {job.accepted_by_name ? (
               <View style={styles.infoRow}>
                 <MaterialIcons name="person" size={18} color={colors.success} />
                 <View>
-                  <Text style={[styles.infoLabel, { color: colors.textTertiary }]}>Accepted By</Text>
-                  <Text style={[styles.infoValue, { color: colors.textPrimary }]}>{job.accepted_by_name}</Text>
+                  <Text
+                    style={[styles.infoLabel, { color: colors.textTertiary }]}
+                  >
+                    Accepted By
+                  </Text>
+                  <Text
+                    style={[styles.infoValue, { color: colors.textPrimary }]}
+                  >
+                    {job.accepted_by_name}
+                  </Text>
                 </View>
               </View>
             ) : null}
             {job.accepted_at ? (
               <View style={styles.infoRow}>
-                <MaterialIcons name="event-available" size={18} color={colors.success} />
+                <MaterialIcons
+                  name="event-available"
+                  size={18}
+                  color={colors.success}
+                />
                 <View>
-                  <Text style={[styles.infoLabel, { color: colors.textTertiary }]}>Accepted On</Text>
-                  <Text style={[styles.infoValue, { color: colors.textPrimary }]}>
-                    {formatDateTime(job.accepted_at)} ({formatRelativeTime(job.accepted_at)})
+                  <Text
+                    style={[styles.infoLabel, { color: colors.textTertiary }]}
+                  >
+                    Accepted On
+                  </Text>
+                  <Text
+                    style={[styles.infoValue, { color: colors.textPrimary }]}
+                  >
+                    {formatDateTime(job.accepted_at)} (
+                    {formatRelativeTime(job.accepted_at)})
                   </Text>
                 </View>
               </View>
@@ -185,27 +317,82 @@ export default function MyJobDetailScreen() {
         {/* Earnings Summary */}
         {(() => {
           const rate = job.rate_used ?? job.pay_rate ?? 0;
-          const estHours = job.estimated_hours ?? calculateShiftHours(job.start_time, job.end_time);
+          const estHours =
+            job.estimated_hours ??
+            calculateShiftHours(job.start_time, job.end_time);
           const estTotal = job.estimated_earnings ?? estHours * rate;
           return (
-            <View style={[styles.card, { backgroundColor: colors.card.background }]}>
-              <Text style={[styles.sectionTitle, { color: colors.textPrimary }]}>Earnings Summary</Text>
+            <View
+              style={[styles.card, { backgroundColor: colors.card.background }]}
+            >
+              <Text
+                style={[styles.sectionTitle, { color: colors.textPrimary }]}
+              >
+                Earnings Summary
+              </Text>
               <View style={styles.earningsRow}>
                 <View style={styles.earningsItem}>
-                  <Text style={[styles.earningsLabel, { color: colors.textTertiary }]}>
-                    {job.total_shifts && job.total_shifts > 1 ? 'Total Hours' : 'Shift Hours'}
+                  <Text
+                    style={[
+                      styles.earningsLabel,
+                      { color: colors.textTertiary },
+                    ]}
+                  >
+                    {job.total_shifts && job.total_shifts > 1
+                      ? "Total Hours"
+                      : "Shift Hours"}
                   </Text>
-                  <Text style={[styles.earningsValue, { color: colors.textPrimary }]}>{estHours}h</Text>
+                  <Text
+                    style={[
+                      styles.earningsValue,
+                      { color: colors.textPrimary },
+                    ]}
+                  >
+                    {estHours}h
+                  </Text>
                 </View>
-                <View style={[styles.earningsDivider, { backgroundColor: colors.divider }]} />
+                <View
+                  style={[
+                    styles.earningsDivider,
+                    { backgroundColor: colors.divider },
+                  ]}
+                />
                 <View style={styles.earningsItem}>
-                  <Text style={[styles.earningsLabel, { color: colors.textTertiary }]}>Hourly Rate</Text>
-                  <Text style={[styles.earningsValue, { color: colors.textPrimary }]}>${rate}</Text>
+                  <Text
+                    style={[
+                      styles.earningsLabel,
+                      { color: colors.textTertiary },
+                    ]}
+                  >
+                    Hourly Rate
+                  </Text>
+                  <Text
+                    style={[
+                      styles.earningsValue,
+                      { color: colors.textPrimary },
+                    ]}
+                  >
+                    ${rate}
+                  </Text>
                 </View>
-                <View style={[styles.earningsDivider, { backgroundColor: colors.divider }]} />
+                <View
+                  style={[
+                    styles.earningsDivider,
+                    { backgroundColor: colors.divider },
+                  ]}
+                />
                 <View style={styles.earningsItem}>
-                  <Text style={[styles.earningsLabel, { color: colors.textTertiary }]}>Estimated Total</Text>
-                  <Text style={[styles.earningsValue, { color: colors.success }]}>
+                  <Text
+                    style={[
+                      styles.earningsLabel,
+                      { color: colors.textTertiary },
+                    ]}
+                  >
+                    Estimated Total
+                  </Text>
+                  <Text
+                    style={[styles.earningsValue, { color: colors.success }]}
+                  >
                     ${Number(estTotal).toFixed(2)}
                   </Text>
                 </View>
@@ -215,33 +402,66 @@ export default function MyJobDetailScreen() {
         })()}
 
         {/* Booking Details — only for booking-sourced jobs */}
-        {(job.source === 'booking' || job.booking_id) && (
-          <View style={[styles.card, { backgroundColor: colors.card.background }]}>
+        {(job.source === "booking" || job.booking_id) && (
+          <View
+            style={[styles.card, { backgroundColor: colors.card.background }]}
+          >
             <View style={styles.bookingHeader}>
-              <MaterialIcons name="event-note" size={20} color={colors.secondary} />
-              <Text style={[styles.sectionTitle, { color: colors.textPrimary, marginBottom: 0 }]}>
+              <MaterialIcons
+                name="event-note"
+                size={20}
+                color={colors.secondary}
+              />
+              <Text
+                style={[
+                  styles.sectionTitle,
+                  { color: colors.textPrimary, marginBottom: 0 },
+                ]}
+              >
                 Booking Details
               </Text>
             </View>
 
             {job.client_name ? (
               <View style={styles.detailRow}>
-                <Text style={[styles.detailLabel, { color: colors.textTertiary }]}>Client</Text>
-                <Text style={[styles.detailValue, { color: colors.textPrimary }]}>{job.client_name}</Text>
+                <Text
+                  style={[styles.detailLabel, { color: colors.textTertiary }]}
+                >
+                  Client
+                </Text>
+                <Text
+                  style={[styles.detailValue, { color: colors.textPrimary }]}
+                >
+                  {job.client_name}
+                </Text>
               </View>
             ) : null}
 
             {job.total_shifts != null ? (
               <View style={styles.detailRow}>
-                <Text style={[styles.detailLabel, { color: colors.textTertiary }]}>Total Shifts</Text>
-                <Text style={[styles.detailValue, { color: colors.textPrimary }]}>{job.total_shifts}</Text>
+                <Text
+                  style={[styles.detailLabel, { color: colors.textTertiary }]}
+                >
+                  Total Shifts
+                </Text>
+                <Text
+                  style={[styles.detailValue, { color: colors.textPrimary }]}
+                >
+                  {job.total_shifts}
+                </Text>
               </View>
             ) : null}
 
             {job.estimated_hours_per_shift != null ? (
               <View style={styles.detailRow}>
-                <Text style={[styles.detailLabel, { color: colors.textTertiary }]}>Hours / Shift</Text>
-                <Text style={[styles.detailValue, { color: colors.textPrimary }]}>
+                <Text
+                  style={[styles.detailLabel, { color: colors.textTertiary }]}
+                >
+                  Hours / Shift
+                </Text>
+                <Text
+                  style={[styles.detailValue, { color: colors.textPrimary }]}
+                >
                   {job.estimated_hours_per_shift}h
                 </Text>
               </View>
@@ -249,9 +469,16 @@ export default function MyJobDetailScreen() {
 
             {job.booking_start_date && job.booking_end_date ? (
               <View style={styles.detailRow}>
-                <Text style={[styles.detailLabel, { color: colors.textTertiary }]}>Date Range</Text>
-                <Text style={[styles.detailValue, { color: colors.textPrimary }]}>
-                  {formatDate(job.booking_start_date)} – {formatDate(job.booking_end_date)}
+                <Text
+                  style={[styles.detailLabel, { color: colors.textTertiary }]}
+                >
+                  Date Range
+                </Text>
+                <Text
+                  style={[styles.detailValue, { color: colors.textPrimary }]}
+                >
+                  {formatDate(job.booking_start_date)} –{" "}
+                  {formatDate(job.booking_end_date)}
                 </Text>
               </View>
             ) : null}
@@ -259,74 +486,153 @@ export default function MyJobDetailScreen() {
         )}
 
         {/* Description */}
-        <View style={[styles.card, { backgroundColor: colors.card.background }]}>
-          <Text style={[styles.sectionTitle, { color: colors.textPrimary }]}>Description</Text>
-          <Text style={[styles.bodyText, { color: colors.textSecondary }]}>{job.description}</Text>
+        <View
+          style={[styles.card, { backgroundColor: colors.card.background }]}
+        >
+          <Text style={[styles.sectionTitle, { color: colors.textPrimary }]}>
+            Description
+          </Text>
+          <Text style={[styles.bodyText, { color: colors.textSecondary }]}>
+            {job.description}
+          </Text>
         </View>
 
         {/* Schedule & Location */}
-        <View style={[styles.card, { backgroundColor: colors.card.background }]}>
-          <Text style={[styles.sectionTitle, { color: colors.textPrimary }]}>Schedule & Location</Text>
+        <View
+          style={[styles.card, { backgroundColor: colors.card.background }]}
+        >
+          <Text style={[styles.sectionTitle, { color: colors.textPrimary }]}>
+            Schedule & Location
+          </Text>
 
           <View style={styles.infoRow}>
-            <MaterialIcons name="calendar-today" size={18} color={colors.primary} />
+            <MaterialIcons
+              name="calendar-today"
+              size={18}
+              color={colors.primary}
+            />
             <View>
-              <Text style={[styles.infoLabel, { color: colors.textTertiary }]}>Date</Text>
-              <Text style={[styles.infoValue, { color: colors.textPrimary }]}>{formatDate(job.job_date)}</Text>
+              <Text style={[styles.infoLabel, { color: colors.textTertiary }]}>
+                Date
+              </Text>
+              <Text style={[styles.infoValue, { color: colors.textPrimary }]}>
+                {formatDate(job.job_date)}
+              </Text>
             </View>
           </View>
 
           <View style={styles.infoRow}>
             <Feather name="clock" size={18} color={colors.primary} />
             <View>
-              <Text style={[styles.infoLabel, { color: colors.textTertiary }]}>Time</Text>
+              <Text style={[styles.infoLabel, { color: colors.textTertiary }]}>
+                Time
+              </Text>
               <Text style={[styles.infoValue, { color: colors.textPrimary }]}>
-                {formatTime(job.start_time)} - {formatTime(job.end_time)} ({calculateShiftHours(job.start_time, job.end_time)}h)
+                {formatTime(job.start_time)} - {formatTime(job.end_time)} (
+                {calculateShiftHours(job.start_time, job.end_time)}h)
               </Text>
             </View>
           </View>
 
           <View style={styles.infoRow}>
-            <MaterialIcons name="location-pin" size={18} color={colors.primary} />
+            <MaterialIcons
+              name="location-pin"
+              size={18}
+              color={colors.primary}
+            />
             <View>
-              <Text style={[styles.infoLabel, { color: colors.textTertiary }]}>Location</Text>
-              <Text style={[styles.infoValue, { color: colors.textPrimary }]}>{job.location}</Text>
+              <Text style={[styles.infoLabel, { color: colors.textTertiary }]}>
+                Location
+              </Text>
+              <Text style={[styles.infoValue, { color: colors.textPrimary }]}>
+                {job.location}
+              </Text>
             </View>
           </View>
         </View>
 
         {/* Requirements */}
         {job.requirements ? (
-          <View style={[styles.card, { backgroundColor: colors.card.background }]}>
-            <Text style={[styles.sectionTitle, { color: colors.textPrimary }]}>Requirements</Text>
-            <Text style={[styles.bodyText, { color: colors.textSecondary }]}>{job.requirements}</Text>
+          <View
+            style={[styles.card, { backgroundColor: colors.card.background }]}
+          >
+            <Text style={[styles.sectionTitle, { color: colors.textPrimary }]}>
+              Requirements
+            </Text>
+            <Text style={[styles.bodyText, { color: colors.textSecondary }]}>
+              {job.requirements}
+            </Text>
           </View>
         ) : null}
 
         {/* Notes */}
         {job.notes ? (
-          <View style={[styles.card, { backgroundColor: colors.card.background }]}>
-            <Text style={[styles.sectionTitle, { color: colors.textPrimary }]}>Notes</Text>
-            <Text style={[styles.bodyText, { color: colors.textSecondary }]}>{job.notes}</Text>
+          <View
+            style={[styles.card, { backgroundColor: colors.card.background }]}
+          >
+            <Text style={[styles.sectionTitle, { color: colors.textPrimary }]}>
+              Notes
+            </Text>
+            <Text style={[styles.bodyText, { color: colors.textSecondary }]}>
+              {job.notes}
+            </Text>
           </View>
         ) : null}
 
         <View style={{ height: 30 }} />
       </ScrollView>
+
+      {(job.accepted_by || job.accepted_by_name || job.accepted_at) && (
+        <View
+          style={[
+            styles.bottomBar,
+            {
+              backgroundColor: colors.background,
+              borderTopColor: colors.border,
+              paddingBottom: 12 + insets.bottom,
+            },
+          ]}
+        >
+          <TouchableOpacity
+            style={[styles.releaseBtn, { borderColor: colors.error }]}
+            activeOpacity={0.8}
+            onPress={handleRelease}
+            disabled={releasing}
+          >
+            {releasing ? (
+              <ActivityIndicator size="small" color={colors.error} />
+            ) : (
+              <Text style={[styles.releaseBtnText, { color: colors.error }]}>
+                Release Job
+              </Text>
+            )}
+          </TouchableOpacity>
+        </View>
+      )}
     </View>
   );
 }
 
 const styles = StyleSheet.create({
   container: { flex: 1 },
-  centered: { flex: 1, justifyContent: 'center', alignItems: 'center', gap: 12 },
-  errorText: { fontSize: 15, textAlign: 'center' },
-  backBtn: { paddingHorizontal: 20, paddingVertical: 10, borderRadius: 8, marginTop: 8 },
-  backBtnText: { color: 'white', fontWeight: '600' },
+  centered: {
+    flex: 1,
+    justifyContent: "center",
+    alignItems: "center",
+    gap: 12,
+  },
+  errorText: { fontSize: 15, textAlign: "center" },
+  backBtn: {
+    paddingHorizontal: 20,
+    paddingVertical: 10,
+    borderRadius: 8,
+    marginTop: 8,
+  },
+  backBtnText: { color: "white", fontWeight: "600" },
   header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
     paddingTop: 60,
     paddingHorizontal: 20,
     paddingBottom: 20,
@@ -334,13 +640,14 @@ const styles = StyleSheet.create({
     borderBottomRightRadius: 30,
   },
   headerBack: { padding: 4 },
-  headerTitle: { fontSize: 18, fontWeight: '700', color: 'white' },
+  headerTitle: { fontSize: 18, fontWeight: "700", color: "white" },
   content: { flex: 1, paddingHorizontal: 20, paddingTop: 16 },
+  contentContainer: { paddingBottom: 120 },
   card: {
     borderRadius: 16,
     padding: 16,
     marginBottom: 16,
-    shadowColor: '#000',
+    shadowColor: "#000",
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.08,
     shadowRadius: 12,
@@ -354,50 +661,109 @@ const styles = StyleSheet.create({
   },
   appliedBadgeRow: { marginBottom: 8 },
   appliedBadge: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    alignSelf: 'flex-start',
+    flexDirection: "row",
+    alignItems: "center",
+    alignSelf: "flex-start",
     gap: 4,
     paddingHorizontal: 10,
     paddingVertical: 4,
     borderRadius: 8,
   },
-  appliedText: { fontSize: 12, fontWeight: '600' },
-  titleRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 8 },
-  jobTitle: { fontSize: 20, fontWeight: '700', flex: 1, marginRight: 8 },
+  appliedText: { fontSize: 12, fontWeight: "600" },
+  titleRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "flex-start",
+    marginBottom: 8,
+  },
+  jobTitle: { fontSize: 20, fontWeight: "700", flex: 1, marginRight: 8 },
   statusBadge: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: "row",
+    alignItems: "center",
     gap: 6,
     paddingHorizontal: 10,
     paddingVertical: 5,
     borderRadius: 12,
   },
   statusDot: { width: 6, height: 6, borderRadius: 3 },
-  statusText: { fontSize: 12, fontWeight: '700' },
-  postedRow: { flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 8 },
-  postedBy: { fontSize: 14, fontWeight: '500' },
-  postedAgo: { fontSize: 12, fontWeight: '500' },
-  payChip: { alignSelf: 'flex-start', paddingHorizontal: 14, paddingVertical: 8, borderRadius: 12, marginTop: 8 },
-  payRate: { fontSize: 18, fontWeight: '700' },
-  acceptedHeader: { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 14 },
-  earningsRow: { flexDirection: 'row', alignItems: 'center' },
-  earningsItem: { flex: 1, alignItems: 'center' },
+  statusText: { fontSize: 12, fontWeight: "700" },
+  postedRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    marginBottom: 8,
+  },
+  postedBy: { fontSize: 14, fontWeight: "500" },
+  postedAgo: { fontSize: 12, fontWeight: "500" },
+  payChip: {
+    alignSelf: "flex-start",
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+    borderRadius: 12,
+    marginTop: 8,
+  },
+  payRate: { fontSize: 18, fontWeight: "700" },
+  acceptedHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    marginBottom: 14,
+  },
+  earningsRow: { flexDirection: "row", alignItems: "center" },
+  earningsItem: { flex: 1, alignItems: "center" },
   earningsDivider: { width: 1, height: 36 },
-  earningsLabel: { fontSize: 11, fontWeight: '500', marginBottom: 6, textAlign: 'center' },
-  earningsValue: { fontSize: 16, fontWeight: '700' },
-  sectionTitle: { fontSize: 16, fontWeight: '700', marginBottom: 12 },
+  earningsLabel: {
+    fontSize: 11,
+    fontWeight: "500",
+    marginBottom: 6,
+    textAlign: "center",
+  },
+  earningsValue: { fontSize: 16, fontWeight: "700" },
+  sectionTitle: { fontSize: 16, fontWeight: "700", marginBottom: 12 },
   bodyText: { fontSize: 14, lineHeight: 22 },
-  bookingHeader: { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 14 },
+  bookingHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    marginBottom: 14,
+  },
   detailRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
     paddingVertical: 8,
   },
   detailLabel: { fontSize: 13 },
-  detailValue: { fontSize: 14, fontWeight: '600', flexShrink: 1, textAlign: 'right', marginLeft: 12 },
-  infoRow: { flexDirection: 'row', alignItems: 'center', gap: 12, marginBottom: 14 },
-  infoLabel: { fontSize: 12, fontWeight: '500' },
-  infoValue: { fontSize: 14, fontWeight: '600', marginTop: 2 },
+  detailValue: {
+    fontSize: 14,
+    fontWeight: "600",
+    flexShrink: 1,
+    textAlign: "right",
+    marginLeft: 12,
+  },
+  infoRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
+    marginBottom: 14,
+  },
+  infoLabel: { fontSize: 12, fontWeight: "500" },
+  infoValue: { fontSize: 14, fontWeight: "600", marginTop: 2 },
+  bottomBar: {
+    position: "absolute",
+    bottom: 0,
+    left: 0,
+    right: 0,
+    paddingHorizontal: 20,
+    paddingTop: 12,
+    paddingBottom: 12,
+    borderTopWidth: 1,
+  },
+  releaseBtn: {
+    paddingVertical: 14,
+    borderRadius: 12,
+    alignItems: "center",
+    borderWidth: 1,
+  },
+  releaseBtnText: { fontSize: 16, fontWeight: "700" },
 });

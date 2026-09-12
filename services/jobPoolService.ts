@@ -146,6 +146,16 @@ export async function releaseJob(jobId: string): Promise<ReleaseJobResponse> {
   });
 }
 
+export async function releaseMyJob(
+  jobId: string,
+  reason = 'Family emergency'
+): Promise<ReleaseJobResponse> {
+  return apiRequest<ReleaseJobResponse>(`/mobile/pool/jobs/${jobId}/release`, {
+    method: 'POST',
+    body: { reason },
+  });
+}
+
 export interface Employee {
   _id: string;
   email: string;

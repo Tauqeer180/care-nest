@@ -1,4 +1,4 @@
-import { useTheme } from '@/hooks/useTheme';
+import { useTheme } from "@/hooks/useTheme";
 import {
   BOOKING_SOURCE_FILTERS,
   BOOKING_SOURCE_LABELS,
@@ -8,10 +8,11 @@ import {
   employeeName,
   fetchClientBookings,
   hasMorePages,
-} from '@/services/clientBookingService';
-import { MaterialIcons } from '@expo/vector-icons';
-import { useFocusEffect, useRouter } from 'expo-router';
-import { useCallback, useState } from 'react';
+} from "@/services/clientBookingService";
+import { onForegroundMessage } from "@/services/notificationService";
+import { MaterialIcons } from "@expo/vector-icons";
+import { useFocusEffect, useRouter } from "expo-router";
+import { useCallback, useEffect, useState } from "react";
 import {
   ActivityIndicator,
   FlatList,
@@ -21,8 +22,8 @@ import {
   Text,
   TouchableOpacity,
   View,
-} from 'react-native';
-import useSWRInfinite from 'swr/infinite';
+} from "react-native";
+import useSWRInfinite from "swr/infinite";
 
 const PAGE_SIZE = 20;
 
@@ -30,16 +31,17 @@ export default function ClientBookingsScreen() {
   const { colors } = useTheme();
   const router = useRouter();
   const [refreshing, setRefreshing] = useState(false);
-  const [source, setSource] = useState<BookingSourceFilter>('all');
+  const [source, setSource] = useState<BookingSourceFilter>("all");
 
-  const { data, error, size, setSize, isLoading, isValidating, mutate } = useSWRInfinite(
-    (index, prev) => {
-      if (prev && !hasMorePages(prev.data.pagination)) return null;
-      return ['client-bookings', source, index + 1, PAGE_SIZE] as const;
-    },
-    ([, src, page, limit]) => fetchClientBookings(src, page, limit),
-    { revalidateOnFocus: true, revalidateFirstPage: false }
-  );
+  const { data, error, size, setSize, isLoading, isValidating, mutate } =
+    useSWRInfinite(
+      (index, prev) => {
+        if (prev && !hasMorePages(prev.data.pagination)) return null;
+        return ["client-bookings", source, index + 1, PAGE_SIZE] as const;
+      },
+      ([, src, page, limit]) => fetchClientBookings(src, page, limit),
+      { revalidateOnFocus: true, revalidateFirstPage: false },
+    );
 
   const bookings = data ? data.flatMap((page) => page.data.bookings) : [];
   const lastPage = data ? data[data.length - 1] : null;
@@ -49,9 +51,17 @@ export default function ClientBookingsScreen() {
   useFocusEffect(
     useCallback(() => {
       mutate();
-    }, [mutate])
+    }, [mutate]),
   );
-
+  useEffect(() => {
+    return onForegroundMessage((message) => {
+      console.log("Foreground message received:", message);
+      if (message.data?.type === "CLIENT_REQUEST_APPROVED") {
+        mutate();
+        // handleRefresh();
+      }
+    });
+  }, [mutate]);
   const handleRefresh = useCallback(async () => {
     setRefreshing(true);
     await mutate();
@@ -66,7 +76,7 @@ export default function ClientBookingsScreen() {
       setSource(value);
       setSize(1);
     },
-    [source, setSize]
+    [source, setSize],
   );
 
   const handleLoadMore = useCallback(() => {
@@ -75,20 +85,24 @@ export default function ClientBookingsScreen() {
   }, [loadingMore, hasMore, size, setSize]);
 
   const formatDate = (dateStr?: string | null) => {
-    if (!dateStr) return '';
+    if (!dateStr) return "";
     const date = new Date(dateStr);
     if (Number.isNaN(date.getTime())) return dateStr;
-    return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+    return date.toLocaleDateString("en-US", {
+      month: "short",
+      day: "numeric",
+      year: "numeric",
+    });
   };
 
   const formatTime = (time?: string | null) => {
-    if (!time) return '';
-    const [h, m] = time.split(':');
+    if (!time) return "";
+    const [h, m] = time.split(":");
     const hour = parseInt(h, 10);
     if (Number.isNaN(hour)) return time;
-    const suffix = hour >= 12 ? 'PM' : 'AM';
+    const suffix = hour >= 12 ? "PM" : "AM";
     const display = hour > 12 ? hour - 12 : hour === 0 ? 12 : hour;
-    return `${display}:${m ?? '00'} ${suffix}`;
+    return `${display}:${m ?? "00"} ${suffix}`;
   };
 
   /** A multi-day booking shows a range; a single-day one shows just the date. */
@@ -108,7 +122,7 @@ export default function ClientBookingsScreen() {
   const openDetail = (booking: ClientBooking) => {
     // source is required by the detail endpoint and must match the list item.
     router.push({
-      pathname: '/client-booking-detail',
+      pathname: "/client-booking-detail",
       params: { id: booking._id, source: booking.source },
     });
   };
@@ -126,16 +140,22 @@ export default function ClientBookingsScreen() {
         <View style={styles.centered}>
           <MaterialIcons name="error-outline" size={48} color={colors.error} />
           <Text style={[styles.errorText, { color: colors.textSecondary }]}>
-            {error.message ?? 'Failed to load bookings'}
+            {error.message ?? "Failed to load bookings"}
           </Text>
         </View>
       );
     }
     return (
       <View style={styles.centered}>
-        <MaterialIcons name="event-busy" size={48} color={colors.textTertiary} />
+        <MaterialIcons
+          name="event-busy"
+          size={48}
+          color={colors.textTertiary}
+        />
         <Text style={[styles.errorText, { color: colors.textSecondary }]}>
-          {source === 'all' ? 'No bookings yet' : 'No bookings in this category'}
+          {source === "all"
+            ? "No bookings yet"
+            : "No bookings in this category"}
         </Text>
       </View>
     );
@@ -145,7 +165,9 @@ export default function ClientBookingsScreen() {
     <View style={[styles.container, { backgroundColor: colors.background }]}>
       <View style={[styles.header, { backgroundColor: colors.primary }]}>
         <Text style={styles.headerTitle}>My Bookings</Text>
-        <Text style={styles.headerSubtitle}>Your appointments and services</Text>
+        <Text style={styles.headerSubtitle}>
+          Your appointments and services
+        </Text>
       </View>
 
       {/* Source filter — mirrors the endpoint's source param */}
@@ -165,7 +187,9 @@ export default function ClientBookingsScreen() {
                 style={[
                   styles.filterChip,
                   {
-                    backgroundColor: active ? colors.primary : colors.card.background,
+                    backgroundColor: active
+                      ? colors.primary
+                      : colors.card.background,
                     borderColor: active ? colors.primary : colors.border,
                   },
                 ]}
@@ -173,7 +197,11 @@ export default function ClientBookingsScreen() {
                 <Text
                   style={[
                     styles.filterChipText,
-                    { color: active ? colors.button.primaryText : colors.textSecondary },
+                    {
+                      color: active
+                        ? colors.button.primaryText
+                        : colors.textSecondary,
+                    },
                   ]}
                 >
                   {filter.label}
@@ -194,13 +222,21 @@ export default function ClientBookingsScreen() {
           style={styles.list}
           showsVerticalScrollIndicator={false}
           refreshControl={
-            <RefreshControl refreshing={refreshing} onRefresh={handleRefresh} tintColor={colors.primary} />
+            <RefreshControl
+              refreshing={refreshing}
+              onRefresh={handleRefresh}
+              tintColor={colors.primary}
+            />
           }
           onEndReached={handleLoadMore}
           onEndReachedThreshold={0.3}
           ListFooterComponent={
             loadingMore ? (
-              <ActivityIndicator size="small" color={colors.primary} style={{ paddingVertical: 20 }} />
+              <ActivityIndicator
+                size="small"
+                color={colors.primary}
+                style={{ paddingVertical: 20 }}
+              />
             ) : null
           }
           renderItem={({ item: booking }) => {
@@ -209,30 +245,59 @@ export default function ClientBookingsScreen() {
               <TouchableOpacity
                 activeOpacity={0.8}
                 onPress={() => openDetail(booking)}
-                style={[styles.card, { backgroundColor: colors.card.background }]}
+                style={[
+                  styles.card,
+                  { backgroundColor: colors.card.background },
+                ]}
               >
                 <View style={styles.cardHeader}>
                   <View style={styles.cardInfo}>
-                    <Text style={[styles.cardTitle, { color: colors.textPrimary }]} numberOfLines={2}>
-                      {booking.service_title || 'Service'}
+                    <Text
+                      style={[styles.cardTitle, { color: colors.textPrimary }]}
+                      numberOfLines={2}
+                    >
+                      {booking.service_title || "Service"}
                     </Text>
                     {booking.floor_name ? (
-                      <Text style={[styles.cardSubtitle, { color: colors.textSecondary }]}>
+                      <Text
+                        style={[
+                          styles.cardSubtitle,
+                          { color: colors.textSecondary },
+                        ]}
+                      >
                         {booking.floor_name}
                       </Text>
                     ) : null}
                   </View>
-                  <View style={[styles.sourceBadge, { backgroundColor: colors.info + '15' }]}>
-                    <Text style={[styles.sourceBadgeText, { color: colors.info }]}>
+                  <View
+                    style={[
+                      styles.sourceBadge,
+                      { backgroundColor: colors.info + "15" },
+                    ]}
+                  >
+                    <Text
+                      style={[styles.sourceBadgeText, { color: colors.info }]}
+                    >
                       {BOOKING_SOURCE_LABELS[booking.source] ?? booking.source}
                     </Text>
                   </View>
                 </View>
 
                 {booking.stage_label ? (
-                  <View style={[styles.stageBadge, { backgroundColor: colors.primary + '15' }]}>
-                    <MaterialIcons name="flag" size={12} color={colors.primary} />
-                    <Text style={[styles.stageBadgeText, { color: colors.primary }]}>
+                  <View
+                    style={[
+                      styles.stageBadge,
+                      { backgroundColor: colors.primary + "15" },
+                    ]}
+                  >
+                    <MaterialIcons
+                      name="flag"
+                      size={12}
+                      color={colors.primary}
+                    />
+                    <Text
+                      style={[styles.stageBadgeText, { color: colors.primary }]}
+                    >
                       {booking.stage_label}
                     </Text>
                   </View>
@@ -240,15 +305,33 @@ export default function ClientBookingsScreen() {
 
                 <View style={styles.detailsRow}>
                   <View style={styles.detailItem}>
-                    <MaterialIcons name="calendar-today" size={14} color={colors.textTertiary} />
-                    <Text style={[styles.detailText, { color: colors.textSecondary }]}>
+                    <MaterialIcons
+                      name="calendar-today"
+                      size={14}
+                      color={colors.textTertiary}
+                    />
+                    <Text
+                      style={[
+                        styles.detailText,
+                        { color: colors.textSecondary },
+                      ]}
+                    >
                       {dateRange(booking)}
                     </Text>
                   </View>
                   {timeRange(booking) ? (
                     <View style={styles.detailItem}>
-                      <MaterialIcons name="schedule" size={14} color={colors.textTertiary} />
-                      <Text style={[styles.detailText, { color: colors.textSecondary }]}>
+                      <MaterialIcons
+                        name="schedule"
+                        size={14}
+                        color={colors.textTertiary}
+                      />
+                      <Text
+                        style={[
+                          styles.detailText,
+                          { color: colors.textSecondary },
+                        ]}
+                      >
                         {timeRange(booking)}
                       </Text>
                     </View>
@@ -258,15 +341,34 @@ export default function ClientBookingsScreen() {
                 {staff ? (
                   <View style={styles.detailsRow}>
                     <View style={styles.detailItem}>
-                      <MaterialIcons name="person" size={14} color={colors.textTertiary} />
-                      <Text style={[styles.detailText, { color: colors.textSecondary }]}>{staff}</Text>
+                      <MaterialIcons
+                        name="person"
+                        size={14}
+                        color={colors.textTertiary}
+                      />
+                      <Text
+                        style={[
+                          styles.detailText,
+                          { color: colors.textSecondary },
+                        ]}
+                      >
+                        {staff}
+                      </Text>
                     </View>
                   </View>
                 ) : null}
 
                 <View style={styles.cardFooter}>
-                  <Text style={[styles.viewDetail, { color: colors.link.color }]}>View Details</Text>
-                  <MaterialIcons name="chevron-right" size={18} color={colors.link.color} />
+                  <Text
+                    style={[styles.viewDetail, { color: colors.link.color }]}
+                  >
+                    View Details
+                  </Text>
+                  <MaterialIcons
+                    name="chevron-right"
+                    size={18}
+                    color={colors.link.color}
+                  />
                 </View>
               </TouchableOpacity>
             );
@@ -276,7 +378,7 @@ export default function ClientBookingsScreen() {
 
       <TouchableOpacity
         activeOpacity={0.85}
-        onPress={() => router.push('/client-create-booking')}
+        onPress={() => router.push("/client-create-booking")}
         style={[styles.fab, { backgroundColor: colors.primary, bottom: 24 }]}
       >
         <MaterialIcons name="add" size={20} color={colors.button.primaryText} />
@@ -301,13 +403,13 @@ const styles = StyleSheet.create({
   },
   headerTitle: {
     fontSize: 28,
-    fontWeight: 'bold',
-    color: 'white',
+    fontWeight: "bold",
+    color: "white",
     marginBottom: 4,
   },
   headerSubtitle: {
     fontSize: 14,
-    color: 'rgba(255,255,255,0.8)',
+    color: "rgba(255,255,255,0.8)",
   },
   filterWrapper: {
     paddingTop: 16,
@@ -324,17 +426,17 @@ const styles = StyleSheet.create({
   },
   filterChipText: {
     fontSize: 13,
-    fontWeight: '600',
+    fontWeight: "600",
   },
   centered: {
     flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
+    justifyContent: "center",
+    alignItems: "center",
     gap: 12,
   },
   errorText: {
     fontSize: 15,
-    textAlign: 'center',
+    textAlign: "center",
   },
   list: {
     flex: 1,
@@ -345,16 +447,16 @@ const styles = StyleSheet.create({
     borderRadius: 16,
     padding: 16,
     marginBottom: 16,
-    shadowColor: '#000',
+    shadowColor: "#000",
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.08,
     shadowRadius: 12,
     elevation: 3,
   },
   cardHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'flex-start',
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "flex-start",
     marginBottom: 8,
   },
   cardInfo: {
@@ -363,12 +465,12 @@ const styles = StyleSheet.create({
   },
   cardTitle: {
     fontSize: 16,
-    fontWeight: '700',
+    fontWeight: "700",
     marginBottom: 4,
   },
   cardSubtitle: {
     fontSize: 13,
-    fontWeight: '500',
+    fontWeight: "500",
   },
   sourceBadge: {
     paddingHorizontal: 10,
@@ -377,12 +479,12 @@ const styles = StyleSheet.create({
   },
   sourceBadgeText: {
     fontSize: 12,
-    fontWeight: '700',
+    fontWeight: "700",
   },
   stageBadge: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    alignSelf: 'flex-start',
+    flexDirection: "row",
+    alignItems: "center",
+    alignSelf: "flex-start",
     gap: 4,
     paddingHorizontal: 8,
     paddingVertical: 4,
@@ -391,48 +493,48 @@ const styles = StyleSheet.create({
   },
   stageBadgeText: {
     fontSize: 11,
-    fontWeight: '700',
+    fontWeight: "700",
   },
   detailsRow: {
-    flexDirection: 'row',
+    flexDirection: "row",
     gap: 16,
     marginBottom: 8,
   },
   detailItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: "row",
+    alignItems: "center",
     gap: 6,
     flexShrink: 1,
   },
   detailText: {
     fontSize: 12,
-    fontWeight: '500',
+    fontWeight: "500",
   },
   fab: {
-    position: 'absolute',
+    position: "absolute",
     right: 20,
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: "row",
+    alignItems: "center",
     gap: 6,
     paddingHorizontal: 18,
     paddingVertical: 14,
     borderRadius: 28,
     elevation: 6,
-    shadowColor: '#000',
+    shadowColor: "#000",
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.2,
     shadowRadius: 8,
   },
-  fabText: { fontSize: 14, fontWeight: '700' },
+  fabText: { fontSize: 14, fontWeight: "700" },
   cardFooter: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'flex-end',
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "flex-end",
     gap: 2,
     marginTop: 4,
   },
   viewDetail: {
     fontSize: 13,
-    fontWeight: '600',
+    fontWeight: "600",
   },
 });

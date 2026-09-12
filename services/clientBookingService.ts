@@ -156,6 +156,21 @@ export async function fetchClientBookingDetail(
   );
 }
 
+export interface DeleteBookingRequestResponse {
+  success: boolean;
+  message?: string;
+}
+
+/** DELETE /mobile/client/booking-requests/:id */
+export async function deleteClientBookingRequest(
+  bookingRequestId: string
+): Promise<DeleteBookingRequestResponse> {
+  return apiRequest<DeleteBookingRequestResponse>(
+    `/mobile/client/booking-requests/${bookingRequestId}`,
+    { method: "DELETE" }
+  );
+}
+
 // ---------------------------------------------------------------------------
 // Display helpers
 // ---------------------------------------------------------------------------
@@ -323,7 +338,7 @@ export interface BookingDetailRow {
 export interface CreateBookingPayload {
   booking_type: BookingType;
   start_date: string;
-  end_date?: string;
+  end_date: string;
   often_type: OftenType;
   booking_details: BookingDetailRow[];
   /**
