@@ -545,7 +545,7 @@ export default function MyJobDetailScreen() {
                 Location
               </Text>
               <Text style={[styles.infoValue, { color: colors.textPrimary }]}>
-                {job.location}
+                {job.client_full_address }
               </Text>
             </View>
           </View>

@@ -5,6 +5,7 @@ export interface Job {
   title: string;
   description: string;
   location: string;
+  client_full_address: string;
   job_date: string;
   start_time: string;
   end_time: string;

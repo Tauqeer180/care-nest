@@ -15,8 +15,8 @@ import { fetchMyJobs } from "@/services/jobPoolService";
 import { getUnreadCount } from "@/services/notificationsService";
 import { SWR_KEYS } from "@/services/swrKeys";
 import { Feather, MaterialIcons } from "@expo/vector-icons";
-import { useFocusEffect, useRouter } from "expo-router";
-import { useCallback, useEffect, useState } from "react";
+import { useRouter } from "expo-router";
+import { useEffect, useState } from "react";
 import {
   ActivityIndicator,
   Alert,
@@ -43,17 +43,12 @@ export default function HomeScreen() {
   }, []);
 
   // SWR: My Applied Jobs (employee only)
-  const {
-    data: myJobsData,
-    isLoading: myJobsLoading,
-    mutate: mutateMyJobs,
-  } = useSWR(
+  const { data: myJobsData, isLoading: myJobsLoading } = useSWR(
     !isAdmin && user ? SWR_KEYS.myJobs(1, 5) : null,
     () => fetchMyJobs(1, 5),
     { revalidateOnFocus: true },
   );
   const myJobs = myJobsData?.data.jobs ?? [];
-  // console.log("My Jobs => ", myJobs);
   // SWR: Attendance status (employee only)
   const { data: attendance, mutate: mutateAttendance } = useSWR(
     !isAdmin && user ? SWR_KEYS.attendanceStatus() : null,
@@ -62,7 +57,7 @@ export default function HomeScreen() {
   );
 
   // SWR: Employee dashboard (employee only)
-  const { data: dashboard, mutate: mutateDashboard } = useSWR(
+  const { data: dashboard } = useSWR(
     !isAdmin && user ? SWR_KEYS.employeeDashboard() : null,
     getEmployeeDashboard,
     { revalidateOnFocus: true },
@@ -75,22 +70,8 @@ export default function HomeScreen() {
     { revalidateOnFocus: true },
   );
 
-  useEffect(() => {
-    // console.log("Dashboard Stats => ", dashboard);
-  }, [dashboard]);
   const stats = dashboard?.stats;
   const upcomingShifts = dashboard?.upcoming_shifts ?? [];
-  // console.log("upcoming Shifts ", upcomingShifts);
-  // Revalidate when tab regains focus
-  useFocusEffect(
-    useCallback(() => {
-      if (!isAdmin) {
-        mutateMyJobs();
-        mutateAttendance();
-        mutateDashboard();
-      }
-    }, [isAdmin, mutateMyJobs, mutateAttendance, mutateDashboard]),
-  );
   const isCheckedIn = attendance?.isCheckedIn ?? false;
   const checkInTime = attendance?.activeCheckIn?.checkInTime ?? null;
   const checkOutTime = attendance?.activeCheckIn?.checkOutTime ?? null;
@@ -628,52 +609,59 @@ export default function HomeScreen() {
                     })
                   }
                 >
-                  <View style={styles.myJobLeft}>
-                    <Text
-                      style={[styles.myJobTitle, { color: colors.textPrimary }]}
-                      numberOfLines={1}
-                    >
-                      {shift.title}
-                    </Text>
+                  <Text
+                    style={[styles.myJobTitle, { color: colors.textPrimary }]}
+                    numberOfLines={1}
+                  >
+                    {shift.title}
+                  </Text>
+                  <View style={styles.myJobDetailsRow}>
                     <View style={styles.myJobMeta}>
-                      <MaterialIcons
-                        name="location-pin"
-                        size={12}
-                        color={colors.textTertiary}
-                      />
-                      <Text
-                        style={[
-                          styles.myJobMetaText,
-                          { color: colors.textSecondary },
-                        ]}
-                      >
-                        {shift.location}
-                      </Text>
-                      <Feather
-                        name="clock"
-                        size={12}
-                        color={colors.textTertiary}
-                      />
-                      <Text
-                        style={[
-                          styles.myJobMetaText,
-                          { color: colors.textSecondary },
-                        ]}
-                      >
-                        {formatDate(shift.job_date)} ·{" "}
-                        {formatTime(shift.start_time)}
-                      </Text>
+                      <View style={styles.myJobMetaItem}>
+                        <MaterialIcons
+                          name="location-pin"
+                          size={12}
+                          color={colors.textTertiary}
+                        />
+                        <Text
+                          style={[
+                            styles.myJobMetaText,
+                            { color: colors.textSecondary },
+                          ]}
+                          numberOfLines={1}
+                        >
+                          {shift.location}
+                        </Text>
+                      </View>
+                      <View style={styles.myJobMetaItem}>
+                        <Feather
+                          name="clock"
+                          size={12}
+                          color={colors.textTertiary}
+                        />
+                        <Text
+                          style={[
+                            styles.myJobMetaText,
+                            { color: colors.textSecondary },
+                          ]}
+                        >
+                          {formatDate(shift.job_date)} ·{" "}
+                          {formatTime(shift.start_time)}
+                        </Text>
+                      </View>
                     </View>
-                  </View>
-                  <View style={styles.myJobRight}>
-                    <Text style={[styles.myJobPay, { color: colors.success }]}>
-                      ${shift.pay_rate ?? 0}/hr
-                    </Text>
-                    <MaterialIcons
-                      name="chevron-right"
-                      size={20}
-                      color={colors.textTertiary}
-                    />
+                    <View style={styles.myJobRight}>
+                      <Text
+                        style={[styles.myJobPay, { color: colors.success }]}
+                      >
+                        ${shift.pay_rate ?? 0}/hr
+                      </Text>
+                      <MaterialIcons
+                        name="chevron-right"
+                        size={20}
+                        color={colors.textTertiary}
+                      />
+                    </View>
                   </View>
                 </TouchableOpacity>
               ))
@@ -727,52 +715,59 @@ export default function HomeScreen() {
                     })
                   }
                 >
-                  <View style={styles.myJobLeft}>
-                    <Text
-                      style={[styles.myJobTitle, { color: colors.textPrimary }]}
-                      numberOfLines={1}
-                    >
-                      {job.title}
-                    </Text>
+                  <Text
+                    style={[styles.myJobTitle, { color: colors.textPrimary }]}
+                    numberOfLines={1}
+                  >
+                    {job.title}
+                  </Text>
+                  <View style={styles.myJobDetailsRow}>
                     <View style={styles.myJobMeta}>
-                      <MaterialIcons
-                        name="location-pin"
-                        size={12}
-                        color={colors.textTertiary}
-                      />
-                      <Text
-                        style={[
-                          styles.myJobMetaText,
-                          { color: colors.textSecondary },
-                        ]}
-                      >
-                        {job.location}
-                      </Text>
-                      <Feather
-                        name="clock"
-                        size={12}
-                        color={colors.textTertiary}
-                      />
-                      <Text
-                        style={[
-                          styles.myJobMetaText,
-                          { color: colors.textSecondary },
-                        ]}
-                      >
-                        {formatDate(job.job_date)} ·{" "}
-                        {formatTime(job.start_time)}
-                      </Text>
+                      <View style={styles.myJobMetaItem}>
+                        <MaterialIcons
+                          name="location-pin"
+                          size={12}
+                          color={colors.textTertiary}
+                        />
+                        <Text
+                          style={[
+                            styles.myJobMetaText,
+                            { color: colors.textSecondary },
+                          ]}
+                          numberOfLines={1}
+                        >
+                          {job.client_full_address}
+                        </Text>
+                      </View>
+                      <View style={styles.myJobMetaItem}>
+                        <Feather
+                          name="clock"
+                          size={12}
+                          color={colors.textTertiary}
+                        />
+                        <Text
+                          style={[
+                            styles.myJobMetaText,
+                            { color: colors.textSecondary },
+                          ]}
+                        >
+                          {formatDate(job.job_date)} ·{" "}
+                          {formatTime(job.start_time)}
+                        </Text>
+                      </View>
                     </View>
-                  </View>
-                  <View style={styles.myJobRight}>
-                    <Text style={[styles.myJobPay, { color: colors.success }]}>
-                      ${job.pay_rate ?? 0}/hr
-                    </Text>
-                    <MaterialIcons
-                      name="chevron-right"
-                      size={20}
-                      color={colors.textTertiary}
-                    />
+                    <View style={styles.myJobRight}>
+                      <Text
+                        style={[styles.myJobPay, { color: colors.success }]}
+                      >
+                        ${job.pay_rate ?? 0}/hr
+                      </Text>
+                      <MaterialIcons
+                        name="chevron-right"
+                        size={20}
+                        color={colors.textTertiary}
+                      />
+                    </View>
                   </View>
                 </TouchableOpacity>
               ))
@@ -1041,22 +1036,25 @@ const styles = StyleSheet.create({
     fontWeight: "500",
   },
   myJobItem: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
+    alignItems: "stretch",
     paddingVertical: 12,
     borderBottomWidth: 1,
-  },
-  myJobLeft: {
-    flex: 1,
-    marginRight: 12,
   },
   myJobTitle: {
     fontSize: 14,
     fontWeight: "600",
-    marginBottom: 4,
+    marginBottom: 8,
+  },
+  myJobDetailsRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
   },
   myJobMeta: {
+    flex: 1,
+    gap: 4,
+  },
+  myJobMetaItem: {
     flexDirection: "row",
     alignItems: "center",
     gap: 4,
@@ -1064,12 +1062,13 @@ const styles = StyleSheet.create({
   myJobMetaText: {
     fontSize: 11,
     fontWeight: "500",
-    marginRight: 6,
+    flexShrink: 1,
   },
   myJobRight: {
     flexDirection: "row",
     alignItems: "center",
     gap: 4,
+    marginLeft: 12,
   },
   myJobPay: {
     fontSize: 13,
