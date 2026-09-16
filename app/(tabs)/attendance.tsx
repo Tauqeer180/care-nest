@@ -8,6 +8,10 @@ import {
   getAttendanceStatus,
   checkIn,
   checkOut,
+  startBreak,
+  endBreak,
+  getActiveBreak,
+  getNetWorkingMs,
   getAttendanceHistory,
   AttendanceSummary,
   ActiveCheckIn,
@@ -33,6 +37,7 @@ export default function AttendanceScreen() {
   const [activeCheckIn, setActiveCheckIn] = useState<ActiveCheckIn | null>(null);
   const [todaySummary, setTodaySummary] = useState<AttendanceSummary | null>(null);
   const [weekSummary, setWeekSummary] = useState<AttendanceSummary | null>(null);
+  const [breakLoading, setBreakLoading] = useState(false);
 
   // History
   const [historyType, setHistoryType] = useState<HistoryType>('daily');
@@ -137,8 +142,35 @@ export default function AttendanceScreen() {
     }
   };
 
+  const handleStartBreak = async () => {
+    setBreakLoading(true);
+    try {
+      await startBreak();
+      await fetchStatus();
+    } catch (error: any) {
+      Alert.alert('Break Failed', error.message || 'Could not start break');
+    } finally {
+      setBreakLoading(false);
+    }
+  };
+
+  const handleEndBreak = async () => {
+    setBreakLoading(true);
+    try {
+      await endBreak();
+      await fetchStatus();
+    } catch (error: any) {
+      Alert.alert('Break Failed', error.message || 'Could not end break');
+    } finally {
+      setBreakLoading(false);
+    }
+  };
+
   const handleCheckOut = async () => {
-    Alert.alert('Check Out', 'Are you sure you want to check out?', [
+    const onBreak = !!getActiveBreak(activeCheckIn?.breaks);
+    Alert.alert('Check Out', onBreak
+      ? 'You are currently on a break. Are you sure you want to check out?'
+      : 'Are you sure you want to check out?', [
       { text: 'Cancel', style: 'cancel' },
       {
         text: 'Check Out',
@@ -159,10 +191,10 @@ export default function AttendanceScreen() {
     ]);
   };
 
-  // Compute elapsed time if checked in
+  // Compute net working time (excluding breaks) if checked in
   const getElapsedTime = () => {
     if (!activeCheckIn?.checkInTime || !isCheckedIn) return null;
-    const diffMs = now.getTime() - new Date(activeCheckIn.checkInTime).getTime();
+    const diffMs = getNetWorkingMs(activeCheckIn.checkInTime, activeCheckIn.breaks, now.getTime());
     const hours = Math.floor(diffMs / 3600000);
     const minutes = Math.floor((diffMs % 3600000) / 60000);
     return `${hours}h ${minutes}m`;
@@ -203,6 +235,20 @@ export default function AttendanceScreen() {
     ? formatTime(activeCheckIn?.checkOutTime)
     : formatTime(todaysLatestRecord?.checkOutTime);
   const elapsed = getElapsedTime();
+
+  const breaks = activeCheckIn?.breaks ?? [];
+  const activeBreak = isCheckedIn ? getActiveBreak(breaks) : null;
+  const totalBreakMinutes = activeCheckIn?.totalBreakMinutes ?? 0;
+  const breakElapsed = (() => {
+    if (!activeBreak) return null;
+    const diffSec = Math.max(
+      0,
+      Math.floor((now.getTime() - new Date(activeBreak.startTime).getTime()) / 1000)
+    );
+    const m = String(Math.floor(diffSec / 60)).padStart(2, '0');
+    const s = String(diffSec % 60).padStart(2, '0');
+    return `${m}:${s}`;
+  })();
 
   const formatDateLabel = (dateStr: string) => {
     const d = new Date(dateStr + 'T00:00:00');
@@ -270,13 +316,52 @@ export default function AttendanceScreen() {
           )}
         </TouchableOpacity>
 
-        {/* Elapsed timer badge */}
-        {isCheckedIn && elapsed && (
-          <View style={[styles.elapsedBadge, { backgroundColor: colors.success + '18' }]}>
-            <Text style={[styles.elapsedText, { color: colors.success }]}>{elapsed} elapsed</Text>
+        {/* Elapsed timer badge (break timer while on a break) */}
+        {isCheckedIn && breakElapsed ? (
+          <View style={[styles.elapsedBadge, { backgroundColor: colors.warning + '18' }]}>
+            <Text style={[styles.elapsedText, { color: colors.warning }]}>On break · {breakElapsed}</Text>
           </View>
-        )}
+        ) : isCheckedIn && elapsed ? (
+          <View style={[styles.elapsedBadge, { backgroundColor: colors.success + '18' }]}>
+            <Text style={[styles.elapsedText, { color: colors.success }]}>{elapsed} worked</Text>
+          </View>
+        ) : null}
       </View>
+
+      {/* Break controls — only available while checked in */}
+      {isCheckedIn && (
+        <View style={styles.breakSection}>
+          <TouchableOpacity
+            style={[
+              styles.breakButton,
+              { borderColor: colors.warning, backgroundColor: activeBreak ? colors.warning : 'transparent' },
+            ]}
+            onPress={activeBreak ? handleEndBreak : handleStartBreak}
+            disabled={breakLoading || actionLoading}
+            activeOpacity={0.7}
+          >
+            {breakLoading ? (
+              <ActivityIndicator size="small" color={activeBreak ? colors.button.primaryText : colors.warning} />
+            ) : (
+              <>
+                <Feather
+                  name={activeBreak ? 'play' : 'coffee'}
+                  size={16}
+                  color={activeBreak ? colors.button.primaryText : colors.warning}
+                />
+                <Text style={[styles.breakButtonText, { color: activeBreak ? colors.button.primaryText : colors.warning }]}>
+                  {activeBreak ? 'End Break' : 'Start Break'}
+                </Text>
+              </>
+            )}
+          </TouchableOpacity>
+          {totalBreakMinutes > 0 && (
+            <Text style={[styles.breakTotal, { color: colors.textTertiary }]}>
+              Total break: {totalBreakMinutes}m · {breaks.length} {breaks.length === 1 ? 'break' : 'breaks'}
+            </Text>
+          )}
+        </View>
+      )}
 
       {/* Stats */}
       <View style={styles.stats}>
@@ -316,6 +401,18 @@ export default function AttendanceScreen() {
           <Text style={[styles.weekRecords, { color: colors.textTertiary }]}>{weekSummary.records} records</Text>
         </View>
       )}
+
+      {/* Manual punch request entry */}
+      <TouchableOpacity
+        style={styles.punchLink}
+        onPress={() => router.push('/punch-requests')}
+        activeOpacity={0.7}
+      >
+        <MaterialIcons name="touch-app" size={16} color={colors.link.color} />
+        <Text style={[styles.punchLinkText, { color: colors.link.color }]}>
+          Forgot to check in or out? Request manual punch
+        </Text>
+      </TouchableOpacity>
 
       {/* History Section */}
       <View
@@ -519,6 +616,30 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontWeight: '600',
   },
+  breakSection: {
+    alignItems: 'center',
+    gap: 8,
+    marginTop: -16,
+    marginBottom: 32,
+  },
+  breakButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    minWidth: 150,
+    paddingHorizontal: 20,
+    paddingVertical: 10,
+    borderRadius: 22,
+    borderWidth: 1.5,
+  },
+  breakButtonText: {
+    fontSize: 14,
+    fontWeight: '600',
+  },
+  breakTotal: {
+    fontSize: 12,
+  },
   stats: {
     flexDirection: 'row',
     justifyContent: 'space-around',
@@ -565,6 +686,19 @@ const styles = StyleSheet.create({
   },
   weekRecords: {
     fontSize: 11,
+  },
+  punchLink: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+    marginHorizontal: 20,
+    marginTop: 16,
+    paddingVertical: 6,
+  },
+  punchLinkText: {
+    fontSize: 13,
+    fontWeight: '500',
   },
   historySection: {
     paddingHorizontal: 20,

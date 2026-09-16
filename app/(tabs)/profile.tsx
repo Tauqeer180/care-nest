@@ -110,6 +110,13 @@ export default function ProfileScreen() {
                   router.push("/(tabs)/attendance?scrollTo=history"),
               },
               {
+                icon: "touch-app" as const,
+                label: "Punch Requests",
+                subtitle: "Request a missed check-in/out",
+                showChevron: true,
+                onPress: () => router.push("/punch-requests"),
+              },
+              {
                 icon: "event-note" as const,
                 label: "Leave Requests",
                 subtitle: "Apply & track leaves",

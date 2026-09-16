@@ -279,7 +279,7 @@ export default function ClientCreateBookingScreen() {
     if (!validateRows()) return;
     const payload = buildPayload();
     // Nested booking_details collapse to [Object] in Metro without stringify.
-    console.log("Create booking body =>", JSON.stringify(payload, null, 2));
+    // console.log("Create booking body =>", JSON.stringify(payload, null, 2));
     setSubmitting(true);
     try {
       await createBookingRequest(payload);

@@ -32,9 +32,9 @@ export default function LeaveRequestDetailScreen() {
     { revalidateOnFocus: true }
   );
 
-  useEffect(() => {
-    if (req) console.log("Leave request detail =>", JSON.stringify(req, null, 2));
-  }, [req]);
+  // useEffect(() => {
+  //   if (req) console.log("Leave request detail =>", JSON.stringify(req, null, 2));
+  // }, [req]);
 
   const statusInfo = (status: LeaveStatus) => {
     switch (status) {

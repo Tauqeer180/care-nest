@@ -281,6 +281,10 @@ function RootLayoutContent() {
             options={{ headerShown: false }}
           />
           <Stack.Screen
+            name="punch-requests"
+            options={{ headerShown: false }}
+          />
+          <Stack.Screen
             name="admin-leave-request-detail"
             options={{ headerShown: false }}
           />

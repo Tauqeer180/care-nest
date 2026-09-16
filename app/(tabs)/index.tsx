@@ -4,7 +4,11 @@ import { AuthUser, getStoredUser } from "@/services/api";
 import {
   checkIn,
   checkOut,
+  endBreak,
+  getActiveBreak,
   getAttendanceStatus,
+  getNetWorkingMs,
+  startBreak,
 } from "@/services/attendanceService";
 import { getEmployeeDashboard } from "@/services/dashboardService";
 import { fetchMyJobs } from "@/services/jobPoolService";
@@ -15,6 +19,7 @@ import { useFocusEffect, useRouter } from "expo-router";
 import { useCallback, useEffect, useState } from "react";
 import {
   ActivityIndicator,
+  Alert,
   ScrollView,
   StyleSheet,
   Text,
@@ -28,6 +33,7 @@ export default function HomeScreen() {
   const router = useRouter();
   const [user, setUser] = useState<AuthUser | null>(null);
   const [checkingIn, setCheckingIn] = useState(false);
+  const [breakLoading, setBreakLoading] = useState(false);
   const [elapsed, setElapsed] = useState("00 : 00 : 00");
 
   const isAdmin = user?.userType === "superadmin";
@@ -47,7 +53,7 @@ export default function HomeScreen() {
     { revalidateOnFocus: true },
   );
   const myJobs = myJobsData?.data.jobs ?? [];
-
+  // console.log("My Jobs => ", myJobs);
   // SWR: Attendance status (employee only)
   const { data: attendance, mutate: mutateAttendance } = useSWR(
     !isAdmin && user ? SWR_KEYS.attendanceStatus() : null,
@@ -66,15 +72,15 @@ export default function HomeScreen() {
   const { data: unreadCount = 0 } = useSWR(
     user ? SWR_KEYS.notificationsUnreadCount() : null,
     getUnreadCount,
-    { revalidateOnFocus: true }
+    { revalidateOnFocus: true },
   );
 
   useEffect(() => {
-    console.log("Dashboard Stats => ", dashboard);
+    // console.log("Dashboard Stats => ", dashboard);
   }, [dashboard]);
   const stats = dashboard?.stats;
   const upcomingShifts = dashboard?.upcoming_shifts ?? [];
-
+  // console.log("upcoming Shifts ", upcomingShifts);
   // Revalidate when tab regains focus
   useFocusEffect(
     useCallback(() => {
@@ -89,17 +95,17 @@ export default function HomeScreen() {
   const checkInTime = attendance?.activeCheckIn?.checkInTime ?? null;
   const checkOutTime = attendance?.activeCheckIn?.checkOutTime ?? null;
   const todayTotal = attendance?.today.totalFormatted ?? "00:00";
+  const breaks = attendance?.activeCheckIn?.breaks;
+  const activeBreak = isCheckedIn ? getActiveBreak(breaks) : null;
 
-  // Live elapsed timer when checked in
+  // Live net working timer (excluding breaks) when checked in
   useEffect(() => {
     if (!isCheckedIn || !checkInTime) {
       setElapsed("00 : 00 : 00");
       return;
     }
     const tick = () => {
-      const diff = Math.floor(
-        (Date.now() - new Date(checkInTime).getTime()) / 1000,
-      );
+      const diff = Math.floor(getNetWorkingMs(checkInTime, breaks) / 1000);
       const h = String(Math.floor(diff / 3600)).padStart(2, "0");
       const m = String(Math.floor((diff % 3600) / 60)).padStart(2, "0");
       const s = String(diff % 60).padStart(2, "0");
@@ -108,7 +114,7 @@ export default function HomeScreen() {
     tick();
     const interval = setInterval(tick, 1000);
     return () => clearInterval(interval);
-  }, [isCheckedIn, checkInTime]);
+  }, [isCheckedIn, checkInTime, breaks]);
 
   const handleCheckInOut = async () => {
     setCheckingIn(true);
@@ -123,6 +129,22 @@ export default function HomeScreen() {
       console.error("Check in/out error:", err.message);
     } finally {
       setCheckingIn(false);
+    }
+  };
+
+  const handleBreak = async () => {
+    setBreakLoading(true);
+    try {
+      if (activeBreak) {
+        await endBreak();
+      } else {
+        await startBreak();
+      }
+      await mutateAttendance();
+    } catch (err: any) {
+      Alert.alert("Break Failed", err.message || "Could not update break");
+    } finally {
+      setBreakLoading(false);
     }
   };
 
@@ -188,7 +210,11 @@ export default function HomeScreen() {
             style={[styles.card, { backgroundColor: colors.card.background }]}
           >
             <Text style={[styles.cardLabel, { color: colors.textSecondary }]}>
-              {isCheckedIn ? "ELAPSED TIME" : "OVERALL TIME"}
+              {activeBreak
+                ? "WORKING TIME (ON BREAK)"
+                : isCheckedIn
+                  ? "WORKING TIME"
+                  : "OVERALL TIME"}
             </Text>
             <View style={styles.timeRow}>
               <Text style={[styles.time, { color: colors.textPrimary }]}>
@@ -215,6 +241,62 @@ export default function HomeScreen() {
                 )}
               </TouchableOpacity>
             </View>
+
+            {/* Break toggle — only while checked in */}
+            {isCheckedIn && (
+              <TouchableOpacity
+                style={[
+                  styles.breakBtn,
+                  {
+                    borderColor: colors.warning,
+                    backgroundColor: activeBreak
+                      ? colors.warning
+                      : "transparent",
+                  },
+                ]}
+                onPress={handleBreak}
+                disabled={breakLoading || checkingIn}
+              >
+                {breakLoading ? (
+                  <ActivityIndicator
+                    size="small"
+                    color={
+                      activeBreak ? colors.button.primaryText : colors.warning
+                    }
+                  />
+                ) : (
+                  <>
+                    <Feather
+                      name={activeBreak ? "play" : "coffee"}
+                      size={16}
+                      color={
+                        activeBreak ? colors.button.primaryText : colors.warning
+                      }
+                    />
+                    <Text
+                      style={[
+                        styles.breakBtnText,
+                        {
+                          color: activeBreak
+                            ? colors.button.primaryText
+                            : colors.warning,
+                        },
+                      ]}
+                    >
+                      {activeBreak
+                        ? `End Break (since ${new Date(
+                            activeBreak.startTime,
+                          ).toLocaleTimeString("en-US", {
+                            hour: "2-digit",
+                            minute: "2-digit",
+                            hour12: true,
+                          })})`
+                        : "Start Break"}
+                    </Text>
+                  </>
+                )}
+              </TouchableOpacity>
+            )}
 
             {/* Time Stats */}
             <View style={styles.timeStats}>
@@ -818,6 +900,21 @@ const styles = StyleSheet.create({
   },
   checkInText: {
     color: "white",
+    fontSize: 14,
+    fontWeight: "600",
+  },
+  breakBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 8,
+    paddingVertical: 10,
+    borderRadius: 20,
+    borderWidth: 1.5,
+    marginTop: -8,
+    marginBottom: 20,
+  },
+  breakBtnText: {
     fontSize: 14,
     fontWeight: "600",
   },

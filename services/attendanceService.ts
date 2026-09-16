@@ -1,5 +1,12 @@
 import { apiRequest } from "./api";
 
+export interface AttendanceBreak {
+  _id: string;
+  startTime: string;
+  endTime: string | null;
+  durationMinutes: number;
+}
+
 export interface ActiveCheckIn {
   _id: string;
   userId: string;
@@ -12,6 +19,9 @@ export interface ActiveCheckIn {
   status: "checked-in" | "checked-out";
   checkInDate: string;
   notes: string;
+  breaks: AttendanceBreak[];
+  totalBreakMinutes: number;
+  netWorkingMinutes: number;
 }
 
 export interface AttendanceSummary {
@@ -114,6 +124,150 @@ export async function checkOut(): Promise<CheckOutResponse["data"]> {
     { method: "POST" }
   );
   return response.data;
+}
+
+// ---- Breaks ----
+
+interface BreakStartResponse {
+  success: boolean;
+  message: string;
+  data: {
+    attendanceId: string;
+    breaks: AttendanceBreak[];
+  };
+}
+
+interface BreakEndResponse {
+  success: boolean;
+  message: string;
+  data: {
+    attendanceId: string;
+    breakDurationMinutes: number;
+    totalBreakMinutes: number;
+    breaks: AttendanceBreak[];
+  };
+}
+
+export async function startBreak(): Promise<BreakStartResponse["data"]> {
+  const response = await apiRequest<BreakStartResponse>(
+    "/mobile/attendance/break/start",
+    { method: "POST" }
+  );
+  return response.data;
+}
+
+export async function endBreak(): Promise<BreakEndResponse["data"]> {
+  const response = await apiRequest<BreakEndResponse>(
+    "/mobile/attendance/break/end",
+    { method: "POST" }
+  );
+  return response.data;
+}
+
+// The break that hasn't ended yet, if the employee is currently on one.
+export function getActiveBreak(
+  breaks?: AttendanceBreak[] | null
+): AttendanceBreak | null {
+  return breaks?.find((b) => !b.endTime) ?? null;
+}
+
+// Time worked since check-in, excluding breaks. An ongoing break counts up
+// to `now`, so the result stays frozen while the employee is on a break.
+export function getNetWorkingMs(
+  checkInTime: string,
+  breaks: AttendanceBreak[] | null | undefined,
+  now: number = Date.now()
+): number {
+  const breakMs = (breaks ?? []).reduce((sum, b) => {
+    const start = new Date(b.startTime).getTime();
+    const end = b.endTime ? new Date(b.endTime).getTime() : now;
+    return sum + Math.max(0, end - start);
+  }, 0);
+  return Math.max(0, now - new Date(checkInTime).getTime() - breakMs);
+}
+
+// ---- Manual punch requests ----
+
+export type PunchType = "check-in" | "check-out";
+export type PunchRequestStatus = "pending" | "approved" | "rejected";
+
+export interface PunchRequest {
+  _id: string;
+  employeeId: string;
+  employeeName: string;
+  employeeEmail: string;
+  requestDate: string; // YYYY-MM-DD
+  punchType: PunchType;
+  requestedTime: string; // ISO
+  reason: string;
+  status: PunchRequestStatus;
+  reviewedBy: { id: string | null; name: string };
+  reviewedAt: string | null;
+  adminNote: string;
+  appliedTime: string | null;
+  attendanceId: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface CreatePunchRequestBody {
+  date: string; // YYYY-MM-DD
+  time: string; // HH:mm (24h)
+  punchType: PunchType;
+  reason: string;
+}
+
+interface CreatePunchRequestResponse {
+  success: boolean;
+  message: string;
+  data: PunchRequest;
+}
+
+interface PunchRequestsResponse {
+  success: boolean;
+  data: {
+    requests: PunchRequest[];
+  };
+}
+
+// Employee: ask admin to record a missed check-in/check-out.
+export async function createPunchRequest(
+  body: CreatePunchRequestBody
+): Promise<CreatePunchRequestResponse> {
+  console.log("Punch Request Body => ", JSON.stringify(body, null, 2));
+  try {
+    const response = await apiRequest<CreatePunchRequestResponse>(
+      "/mobile/attendance/punch-request",
+      {
+        method: "POST",
+        body: body as unknown as Record<string, unknown>,
+      }
+    );
+    console.log(
+      "Punch Request Response => ",
+      JSON.stringify(response, null, 2)
+    );
+    return response;
+  } catch (error: any) {
+    console.log("Punch Request Error => ", error?.message ?? error);
+    throw error;
+  }
+}
+
+export async function getMyPunchRequests(): Promise<PunchRequest[]> {
+  try {
+    const response = await apiRequest<PunchRequestsResponse>(
+      "/mobile/attendance/punch-requests"
+    );
+    console.log(
+      "Punch Requests List Response => ",
+      JSON.stringify(response, null, 2)
+    );
+    return response.data.requests;
+  } catch (error: any) {
+    console.log("Punch Requests List Error => ", error?.message ?? error);
+    throw error;
+  }
 }
 
 // ---- Admin attendance ----

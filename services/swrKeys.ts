@@ -4,6 +4,7 @@ export const SWR_KEYS = {
   jobDetail: (id: string) => ["job-detail", id] as const,
   myJobDetail: (id: string) => ["my-job-detail", id] as const,
   attendanceStatus: () => ["attendance-status"] as const,
+  punchRequests: () => ["punch-requests"] as const,
   adminJobs: (page: number, limit: number, status: string) =>
     ["admin-jobs", page, limit, status] as const,
   adminJobDetail: (id: string) => ["admin-job-detail", id] as const,

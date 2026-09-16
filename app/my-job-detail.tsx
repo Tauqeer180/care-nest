@@ -117,10 +117,10 @@ export default function MyJobDetailScreen() {
             setReleasing(true);
             try {
               const response = await releaseMyJob(id);
-              console.log(
-                "Release My Job Response:",
-                JSON.stringify(response, null, 2),
-              );
+              // console.log(
+              //   "Release My Job Response:",
+              //   JSON.stringify(response, null, 2),
+              // );
               globalMutate(
                 (key) =>
                   Array.isArray(key) &&

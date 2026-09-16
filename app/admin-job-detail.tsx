@@ -41,7 +41,7 @@ export default function AdminJobDetailScreen() {
             setApproving(true);
             try {
               const response = await approveJob(id);
-              console.log('Approve Job Response:', JSON.stringify(response, null, 2));
+              // console.log('Approve Job Response:', JSON.stringify(response, null, 2));
               mutate();
               globalMutate((key) => Array.isArray(key) && key[0] === 'admin-jobs');
             } catch (err: any) {
@@ -61,7 +61,7 @@ export default function AdminJobDetailScreen() {
     setAssigning(true);
     try {
       const response = await assignJob(id, employee._id);
-      console.log('Assign Job Response:', JSON.stringify(response, null, 2));
+      // console.log('Assign Job Response:', JSON.stringify(response, null, 2));
       mutate();
       globalMutate((key) => Array.isArray(key) && key[0] === 'admin-jobs');
       setPickerOpen(false);
@@ -87,7 +87,7 @@ export default function AdminJobDetailScreen() {
             setReleasing(true);
             try {
               const response = await releaseJob(id);
-              console.log('Release Job Response:', JSON.stringify(response, null, 2));
+              // console.log('Release Job Response:', JSON.stringify(response, null, 2));
               // Revalidate detail + list
               mutate();
               globalMutate((key) => Array.isArray(key) && key[0] === 'admin-jobs');
