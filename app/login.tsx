@@ -291,6 +291,7 @@ export default function LoginScreen() {
       position: "relative" as const,
     },
     input: {
+      height: 48,
       borderWidth: 1,
       borderColor: colors.input.border,
       borderRadius: 8,
@@ -309,10 +310,10 @@ export default function LoginScreen() {
     passwordInputContainer: {
       flexDirection: "row" as const,
       alignItems: "center" as const,
+      height: 48,
       borderWidth: 1,
       borderColor: colors.input.border,
       borderRadius: 8,
-      paddingVertical: 12,
       paddingHorizontal: 14,
       backgroundColor: colors.input.background,
     },
@@ -329,7 +330,7 @@ export default function LoginScreen() {
       padding: 0,
     },
     togglePasswordButton: {
-      padding: 8,
+      padding: 0,
       marginLeft: 8,
     },
     errorText: {

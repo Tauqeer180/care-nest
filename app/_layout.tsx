@@ -293,6 +293,14 @@ function RootLayoutContent() {
             options={{ headerShown: false }}
           />
           <Stack.Screen
+            name="employee-visit-detail"
+            options={{ headerShown: false }}
+          />
+          <Stack.Screen
+            name="client-visit-report-detail"
+            options={{ headerShown: false }}
+          />
+          <Stack.Screen
             name="client-edit-profile"
             options={{ headerShown: false }}
           />

@@ -191,6 +191,118 @@ export function employeePhone(employee: BookingEmployee | undefined): string {
   return employee.phone ?? employee.cell ?? "";
 }
 
+export interface ClientVisitReportAttachment {
+  name?: string;
+  url?: string;
+  type?: string;
+  [key: string]: unknown;
+}
+
+export interface ClientVisitReportRecord {
+  visit?: Record<string, unknown>;
+  report?: Record<string, unknown> | null;
+  _id?: string;
+  booking_id?: string;
+  visit_date?: string;
+  start_time?: string;
+  end_time?: string;
+  service_name?: string;
+  service_title?: string | string[];
+  employee_name?: string;
+  tasks_note?: string;
+  status?: string;
+  attachments?: ClientVisitReportAttachment[];
+  created_at?: string;
+  [key: string]: unknown;
+}
+
+export function getClientVisitReportValue(
+  report: ClientVisitReportRecord,
+  field: string,
+): unknown {
+  if (report[field] !== undefined && report[field] !== null) {
+    return report[field];
+  }
+  const nestedReport = asRecord(report.report);
+  if (nestedReport?.[field] !== undefined && nestedReport[field] !== null) {
+    return nestedReport[field];
+  }
+  return asRecord(report.visit)?.[field];
+}
+
+/** GET /mobile/client/visit-reports?from=...&to=... */
+export async function fetchClientVisitReports(
+  from?: string,
+  to?: string,
+): Promise<unknown> {
+  const query = new URLSearchParams();
+  if (from) query.set("from", from);
+  if (to) query.set("to", to);
+  const suffix = query.toString();
+  return apiRequest<unknown>(
+    `/mobile/client/visit-reports${suffix ? `?${suffix}` : ""}`,
+  );
+}
+
+/** GET /mobile/client/visit-reports?booking_id=... */
+export async function fetchClientVisitReportDetail(
+  bookingId: string,
+): Promise<unknown> {
+  return apiRequest<unknown>(
+    `/mobile/client/visit-reports?booking_id=${encodeURIComponent(bookingId)}`,
+  );
+}
+
+function asRecord(value: unknown): Record<string, unknown> | null {
+  return value !== null && typeof value === "object" && !Array.isArray(value)
+    ? (value as Record<string, unknown>)
+    : null;
+}
+
+/** Supports the common root/data wrappers used by mobile API responses. */
+export function extractClientVisitReports(
+  response: unknown,
+): ClientVisitReportRecord[] {
+  const root = asRecord(response);
+  const data = asRecord(root?.data);
+  const candidates = [
+    root?.reports,
+    root?.results,
+    root?.visits,
+    Array.isArray(root?.data) ? root.data : undefined,
+    data?.reports,
+    data?.results,
+    data?.visits,
+    data?.records,
+  ];
+  const list = candidates.find(Array.isArray);
+  const normalize = (record: ClientVisitReportRecord): ClientVisitReportRecord => ({
+    ...asRecord(record.visit),
+    ...asRecord(record.report),
+    ...record,
+  });
+  if (Array.isArray(list)) {
+    return list.filter(
+      (item): item is ClientVisitReportRecord => asRecord(item) !== null,
+    ).map(normalize);
+  }
+
+  const single = asRecord(root?.report) ?? asRecord(data?.report);
+  if (single) {
+    return [
+      normalize({
+        ...asRecord(root?.visit),
+        ...asRecord(data?.visit),
+        ...single,
+      } as ClientVisitReportRecord),
+    ];
+  }
+  if (root && (root.booking_id || root.tasks_note)) {
+    return [root as ClientVisitReportRecord];
+  }
+  return [];
+}
+
 /** Human label for a source tag, used on list badges. */
 export const BOOKING_SOURCE_LABELS: Record<BookingSource, string> = {
   request: "Request",

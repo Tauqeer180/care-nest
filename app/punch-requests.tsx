@@ -1,4 +1,5 @@
 import { useCallback, useState } from "react";
+import * as DocumentPicker from "expo-document-picker";
 import {
   StyleSheet,
   View,
@@ -22,8 +23,10 @@ import { Feather, MaterialIcons } from "@expo/vector-icons";
 import {
   createPunchRequest,
   getMyPunchRequests,
+  PunchRequestAttachment,
   PunchRequestStatus,
   PunchType,
+  uploadPunchRequestAttachment,
 } from "@/services/attendanceService";
 import { SWR_KEYS } from "@/services/swrKeys";
 
@@ -49,6 +52,7 @@ export default function PunchRequestsScreen() {
   const [refreshing, setRefreshing] = useState(false);
   const [modalOpen, setModalOpen] = useState(false);
   const [submitting, setSubmitting] = useState(false);
+  const [uploadingAttachment, setUploadingAttachment] = useState(false);
 
   // Form state
   const [punchType, setPunchType] = useState<PunchType>("check-in");
@@ -57,6 +61,7 @@ export default function PunchRequestsScreen() {
   const [showDatePicker, setShowDatePicker] = useState(false);
   const [showTimePicker, setShowTimePicker] = useState(false);
   const [reason, setReason] = useState("");
+  const [attachment, setAttachment] = useState<PunchRequestAttachment | null>(null);
   const [formError, setFormError] = useState("");
 
   const toYMD = (d: Date) =>
@@ -85,11 +90,53 @@ export default function PunchRequestsScreen() {
     setDate(null);
     setTime(null);
     setReason("");
+    setAttachment(null);
     setFormError("");
+  };
+
+  const handleAttachFile = async () => {
+    setFormError("");
+    try {
+      const selection = await DocumentPicker.getDocumentAsync({
+        type: [
+          "image/*",
+          "application/pdf",
+          "text/plain",
+          "application/msword",
+          "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+        ],
+        multiple: false,
+        copyToCacheDirectory: true,
+      });
+      if (selection.canceled) return;
+
+      const file = selection.assets[0];
+      if (!file) return;
+
+      setUploadingAttachment(true);
+      const uploaded = await uploadPunchRequestAttachment({
+        uri: file.uri,
+        name: file.name,
+        mimeType: file.mimeType,
+      });
+      setAttachment(uploaded);
+    } catch (uploadError) {
+      setFormError(
+        uploadError instanceof Error
+          ? uploadError.message
+          : "Could not upload attachment. Please try again.",
+      );
+    } finally {
+      setUploadingAttachment(false);
+    }
   };
 
   const handleSubmit = async () => {
     setFormError("");
+    if (uploadingAttachment) {
+      setFormError("Please wait for the attachment to finish uploading");
+      return;
+    }
     if (!date || !time) {
       setFormError("Please select date and time");
       return;
@@ -111,6 +158,7 @@ export default function PunchRequestsScreen() {
         time: toHM(time),
         punchType,
         reason: reason.trim(),
+        ...(attachment ? { attachment } : {}),
       });
       setModalOpen(false);
       resetForm();
@@ -394,12 +442,63 @@ export default function PunchRequestsScreen() {
                 textAlignVertical="top"
               />
 
+              <Text style={[styles.label, { color: colors.textPrimary }]}>Attachment (optional)</Text>
+              <TouchableOpacity
+                style={[
+                  styles.attachmentButton,
+                  { borderColor: colors.primary, opacity: uploadingAttachment || submitting ? 0.6 : 1 },
+                ]}
+                onPress={() => void handleAttachFile()}
+                disabled={uploadingAttachment || submitting}
+                activeOpacity={0.7}
+              >
+                {uploadingAttachment ? (
+                  <ActivityIndicator size="small" color={colors.primary} />
+                ) : (
+                  <MaterialIcons name="attach-file" size={18} color={colors.primary} />
+                )}
+                <Text style={[styles.attachmentButtonText, { color: colors.primary }]}>
+                  {uploadingAttachment
+                    ? "Uploading attachment..."
+                    : attachment
+                    ? "Replace attachment"
+                    : "Add attachment"}
+                </Text>
+              </TouchableOpacity>
+              {attachment ? (
+                <View
+                  style={[
+                    styles.selectedAttachment,
+                    { backgroundColor: colors.card.background, borderColor: colors.border },
+                  ]}
+                >
+                  <MaterialIcons name="description" size={20} color={colors.primary} />
+                  <Text
+                    style={[styles.selectedAttachmentName, { color: colors.textSecondary }]}
+                    numberOfLines={1}
+                  >
+                    {attachment.name}
+                  </Text>
+                  <TouchableOpacity
+                    onPress={() => setAttachment(null)}
+                    disabled={submitting || uploadingAttachment}
+                    accessibilityRole="button"
+                    accessibilityLabel="Remove attachment"
+                  >
+                    <MaterialIcons name="close" size={20} color={colors.error} />
+                  </TouchableOpacity>
+                </View>
+              ) : null}
+
               {formError ? <Text style={[styles.errorText, { color: colors.error }]}>{formError}</Text> : null}
 
               <TouchableOpacity
-                style={[styles.submitBtn, { backgroundColor: colors.primary }]}
+                style={[
+                  styles.submitBtn,
+                  { backgroundColor: colors.primary, opacity: uploadingAttachment ? 0.6 : 1 },
+                ]}
                 onPress={handleSubmit}
-                disabled={submitting}
+                disabled={submitting || uploadingAttachment}
                 activeOpacity={0.85}
               >
                 {submitting ? (
@@ -485,6 +584,27 @@ const styles = StyleSheet.create({
   input: { borderWidth: 1, borderRadius: 8, paddingVertical: 12, paddingHorizontal: 14, fontSize: 14 },
   dateInput: { flexDirection: "row", alignItems: "center", justifyContent: "space-between" },
   textArea: { height: 100 },
+  attachmentButton: {
+    minHeight: 44,
+    borderWidth: 1,
+    borderRadius: 8,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 7,
+  },
+  attachmentButtonText: { fontSize: 13, fontWeight: "600" },
+  selectedAttachment: {
+    minHeight: 42,
+    borderWidth: 1,
+    borderRadius: 8,
+    paddingHorizontal: 10,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    marginTop: 8,
+  },
+  selectedAttachmentName: { flex: 1, fontSize: 12 },
   errorText: { fontSize: 13, marginTop: 12 },
   submitBtn: { paddingVertical: 14, borderRadius: 8, alignItems: "center", marginTop: 20 },
   submitBtnText: { color: "white", fontSize: 16, fontWeight: "700" },

@@ -137,7 +137,7 @@ export async function clearAuthData(): Promise<void> {
 
 interface RequestOptions {
   method?: "GET" | "POST" | "PUT" | "PATCH" | "DELETE";
-  body?: Record<string, unknown>;
+  body?: Record<string, unknown> | FormData;
   headers?: Record<string, string>;
   skipCompanyHeader?: boolean;
 }
@@ -262,9 +262,10 @@ export async function apiRequest<T>(
   isRetry = false
 ): Promise<T> {
   const { method = "GET", body, headers = {}, skipCompanyHeader = false } = options;
+  const isMultipart = typeof FormData !== "undefined" && body instanceof FormData;
 
   const requestHeaders: Record<string, string> = {
-    "Content-Type": "application/json",
+    ...(isMultipart ? {} : { "Content-Type": "application/json" }),
     ...headers,
   };
 
@@ -283,7 +284,7 @@ export async function apiRequest<T>(
   const response = await fetch(`${BASE_URL}${endpoint}`, {
     method,
     headers: requestHeaders,
-    body: body ? JSON.stringify(body) : undefined,
+    body: body ? (isMultipart ? body : JSON.stringify(body)) : undefined,
   });
 
   const data = await response.json();

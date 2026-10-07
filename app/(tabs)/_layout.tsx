@@ -54,6 +54,16 @@ export default function TabLayout() {
         }}
       />
       <Tabs.Screen
+        name="employee-visits"
+        options={{
+          title: "Visits",
+          tabBarIcon: ({ color }) => (
+            <MaterialIcons size={28} name="event-note" color={color} />
+          ),
+          href: employeeOnly ? "/employee-visits" : null,
+        }}
+      />
+      <Tabs.Screen
         name="admin-jobs"
         options={{
           title: "Manage Jobs",
@@ -91,6 +101,16 @@ export default function TabLayout() {
             <MaterialIcons size={28} name="event-available" color={color} />
           ),
           href: isClient ? "/client-bookings" : null,
+        }}
+      />
+      <Tabs.Screen
+        name="client-visit-reports"
+        options={{
+          title: "Visit Reports",
+          tabBarIcon: ({ color }) => (
+            <MaterialIcons size={28} name="description" color={color} />
+          ),
+          href: isClient ? "/client-visit-reports" : null,
         }}
       />
       <Tabs.Screen

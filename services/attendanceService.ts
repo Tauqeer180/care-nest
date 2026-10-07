@@ -191,6 +191,13 @@ export function getNetWorkingMs(
 export type PunchType = "check-in" | "check-out";
 export type PunchRequestStatus = "pending" | "approved" | "rejected";
 
+export interface PunchRequestAttachment {
+  name: string;
+  url: string;
+  size: number;
+  type: string;
+}
+
 export interface PunchRequest {
   _id: string;
   employeeId: string;
@@ -206,6 +213,7 @@ export interface PunchRequest {
   adminNote: string;
   appliedTime: string | null;
   attendanceId: string | null;
+  attachment?: PunchRequestAttachment;
   createdAt: string;
   updatedAt: string;
 }
@@ -215,6 +223,7 @@ export interface CreatePunchRequestBody {
   time: string; // HH:mm (24h)
   punchType: PunchType;
   reason: string;
+  attachment?: PunchRequestAttachment;
 }
 
 interface CreatePunchRequestResponse {
@@ -230,11 +239,29 @@ interface PunchRequestsResponse {
   };
 }
 
+export async function uploadPunchRequestAttachment(
+  file: { uri: string; name: string; mimeType?: string | null },
+): Promise<PunchRequestAttachment> {
+  const formData = new FormData();
+  formData.append(
+    "file",
+    {
+      uri: file.uri,
+      name: file.name,
+      type: file.mimeType ?? "application/octet-stream",
+    } as unknown as Blob,
+  );
+  return apiRequest<PunchRequestAttachment>(
+    "/mobile/attendance/punch-request/upload",
+    { method: "POST", body: formData },
+  );
+}
+
 // Employee: ask admin to record a missed check-in/check-out.
 export async function createPunchRequest(
   body: CreatePunchRequestBody
 ): Promise<CreatePunchRequestResponse> {
-  console.log("Punch Request Body => ", JSON.stringify(body, null, 2));
+  // console.log("Punch Request Body => ", JSON.stringify(body, null, 2));
   try {
     const response = await apiRequest<CreatePunchRequestResponse>(
       "/mobile/attendance/punch-request",
@@ -259,10 +286,10 @@ export async function getMyPunchRequests(): Promise<PunchRequest[]> {
     const response = await apiRequest<PunchRequestsResponse>(
       "/mobile/attendance/punch-requests"
     );
-    console.log(
-      "Punch Requests List Response => ",
-      JSON.stringify(response, null, 2)
-    );
+    // console.log(
+    //   "Punch Requests List Response => ",
+    //   JSON.stringify(response, null, 2)
+    // );
     return response.data.requests;
   } catch (error: any) {
     console.log("Punch Requests List Error => ", error?.message ?? error);

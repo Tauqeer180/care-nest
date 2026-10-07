@@ -11,6 +11,7 @@ import {
   startBreak,
 } from "@/services/attendanceService";
 import { getEmployeeDashboard } from "@/services/dashboardService";
+import { fetchEmployeeVisits } from "@/services/employeeVisitsService";
 import { fetchMyJobs } from "@/services/jobPoolService";
 import { getUnreadCount } from "@/services/notificationsService";
 import { SWR_KEYS } from "@/services/swrKeys";
@@ -62,6 +63,30 @@ export default function HomeScreen() {
     getEmployeeDashboard,
     { revalidateOnFocus: true },
   );
+
+  // Employee visits are fetched only for employee accounts.
+  const {
+    data: employeeVisits,
+    error: employeeVisitsError,
+  } = useSWR(
+    user?.userType === "employee"
+      ? SWR_KEYS.employeeVisits(user.id)
+      : null,
+    fetchEmployeeVisits,
+    { revalidateOnFocus: true },
+  );
+
+  useEffect(() => {
+    if (employeeVisits !== undefined) {
+      // console.log("Employee visits =>", JSON.stringify(employeeVisits, null, 2));
+    }
+  }, [employeeVisits]);
+
+  useEffect(() => {
+    if (employeeVisitsError) {
+      console.error("Employee visits error =>", employeeVisitsError);
+    }
+  }, [employeeVisitsError]);
 
   // SWR: Unread notifications count (all users)
   const { data: unreadCount = 0 } = useSWR(
