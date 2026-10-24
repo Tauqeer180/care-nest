@@ -6,6 +6,7 @@ import { Feather, MaterialIcons } from '@expo/vector-icons';
 import useSWRInfinite from 'swr/infinite';
 import { fetchJobPoolListings } from '@/services/jobPoolService';
 import { onForegroundMessage } from '@/services/notificationService';
+import { formatCurrency } from "@/utils/currency";
 
 const PAGE_SIZE = 20;
 
@@ -119,8 +120,8 @@ export default function JobPoolScreen() {
                   </Text>
                 </View>
                 <View style={[styles.payBadge, { backgroundColor: colors.success + '15' }]}>
-                  <Text style={[styles.payText, { color: colors.success }]}>
-                    ${job.pay_rate ?? job.rate_used ?? 0}/hr
+                  <Text style={[styles.payText, { color: colors.success }]} numberOfLines={1}>
+                    {formatCurrency(job.pay_rate ?? job.rate_used)}/hr
                   </Text>
                 </View>
               </View>
@@ -165,7 +166,7 @@ export default function JobPoolScreen() {
                   <View style={styles.detailItem}>
                     <MaterialIcons name="payments" size={14} color={colors.textTertiary} />
                     <Text style={[styles.detailText, { color: colors.textSecondary }]}>
-                      Est. ${job.estimated_earnings}
+                      Est. {formatCurrency(job.estimated_earnings)}
                       {job.estimated_hours != null ? ` · ${job.estimated_hours}h` : ''}
                     </Text>
                   </View>
@@ -178,7 +179,7 @@ export default function JobPoolScreen() {
                     <MaterialIcons name="layers" size={14} color={colors.textTertiary} />
                     <Text style={[styles.detailText, { color: colors.textTertiary }]} numberOfLines={1}>
                       {job.group_label}
-                      {job.group_estimated_earnings != null ? ` · Group est. $${job.group_estimated_earnings}` : ''}
+                      {job.group_estimated_earnings != null ? ` · Group est. ${formatCurrency(job.group_estimated_earnings)}` : ''}
                     </Text>
                   </View>
                 </View>
@@ -277,6 +278,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 10,
     paddingVertical: 6,
     borderRadius: 10,
+    flexShrink: 0,
   },
   payText: {
     fontSize: 14,
@@ -304,7 +306,9 @@ const styles = StyleSheet.create({
   },
   detailsRow: {
     flexDirection: 'row',
-    gap: 16,
+    flexWrap: 'wrap',
+    columnGap: 16,
+    rowGap: 6,
     marginBottom: 8,
   },
   detailItem: {

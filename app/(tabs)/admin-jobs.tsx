@@ -14,6 +14,7 @@ import { useTheme } from '@/hooks/useTheme';
 import { Feather, MaterialIcons } from '@expo/vector-icons';
 import useSWRInfinite from 'swr/infinite';
 import { fetchAdminJobs, AdminJobStatus } from '@/services/jobPoolService';
+import { formatCurrency } from "@/utils/currency";
 
 const PAGE_SIZE = 20;
 
@@ -228,7 +229,7 @@ export default function AdminJobsScreen() {
 
                 <View style={styles.footerRow}>
                   <View style={[styles.payBadge, { backgroundColor: colors.success + '15' }]}>
-                    <Text style={[styles.payText, { color: colors.success }]}>${job.pay_rate ?? 0}/hr</Text>
+                    <Text style={[styles.payText, { color: colors.success }]}>{formatCurrency(job.pay_rate)}/hr</Text>
                   </View>
                   {job.accepted_by_name ? (
                     <View style={styles.acceptedRow}>
@@ -383,6 +384,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 10,
     paddingVertical: 5,
     borderRadius: 10,
+    flexShrink: 0,
   },
   payText: {
     fontSize: 13,

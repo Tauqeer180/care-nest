@@ -28,6 +28,7 @@ import {
   View,
 } from "react-native";
 import useSWR, { mutate } from "swr";
+import { formatCurrency } from "@/utils/currency";
 
 export default function HomeScreen() {
   const { colors } = useTheme();
@@ -548,8 +549,13 @@ export default function HomeScreen() {
             </View>
             <View style={styles.monthGrid}>
               <View style={styles.monthItem}>
-                <Text style={[styles.monthValue, { color: colors.success }]}>
-                  ${stats.earnings_this_month}
+                <Text
+                  style={[styles.monthValue, { color: colors.success }]}
+                  numberOfLines={1}
+                  adjustsFontSizeToFit
+                  minimumFontScale={0.6}
+                >
+                  {formatCurrency(stats.earnings_this_month)}
                 </Text>
                 <Text
                   style={[styles.monthLabel, { color: colors.textTertiary }]}
@@ -582,8 +588,13 @@ export default function HomeScreen() {
                 </Text>
               </View>
               <View style={styles.monthItem}>
-                <Text style={[styles.monthValue, { color: colors.secondary }]}>
-                  ${stats.paid_this_month}
+                <Text
+                  style={[styles.monthValue, { color: colors.secondary }]}
+                  numberOfLines={1}
+                  adjustsFontSizeToFit
+                  minimumFontScale={0.6}
+                >
+                  {formatCurrency(stats.paid_this_month)}
                 </Text>
                 <Text
                   style={[styles.monthLabel, { color: colors.textTertiary }]}
@@ -679,7 +690,7 @@ export default function HomeScreen() {
                       <Text
                         style={[styles.myJobPay, { color: colors.success }]}
                       >
-                        ${shift.pay_rate ?? 0}/hr
+                        {formatCurrency(shift.pay_rate)}/hr
                       </Text>
                       <MaterialIcons
                         name="chevron-right"
@@ -785,7 +796,7 @@ export default function HomeScreen() {
                       <Text
                         style={[styles.myJobPay, { color: colors.success }]}
                       >
-                        ${job.pay_rate ?? 0}/hr
+                        {formatCurrency(job.pay_rate)}/hr
                       </Text>
                       <MaterialIcons
                         name="chevron-right"
@@ -1012,9 +1023,10 @@ const styles = StyleSheet.create({
   monthItem: {
     alignItems: "center",
     flex: 1,
+    paddingHorizontal: 2,
   },
   monthValue: {
-    fontSize: 18,
+    fontSize: 14,
     fontWeight: "700",
   },
   monthLabel: {
@@ -1094,6 +1106,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
     gap: 4,
     marginLeft: 12,
+    flexShrink: 0,
   },
   myJobPay: {
     fontSize: 13,

@@ -17,6 +17,7 @@ import {
   getEmployeeEarningsHistory,
   EarningsRecord,
 } from "@/services/dashboardService";
+import { formatCurrency } from "@/utils/currency";
 
 const PAGE_SIZE = 20;
 
@@ -89,8 +90,8 @@ export default function EarningsHistoryScreen() {
                 { backgroundColor: colors.card.background, borderColor: colors.border },
               ]}
             >
-              <Text style={[styles.summaryValue, { color: colors.success }]}>
-                ${summary.total_earnings}
+              <Text style={[styles.summaryValue, { color: colors.success }]} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.6}>
+                {formatCurrency(summary.total_earnings)}
               </Text>
               <Text style={[styles.summaryLabel, { color: colors.textSecondary }]}>
                 Total Earned
@@ -102,8 +103,8 @@ export default function EarningsHistoryScreen() {
                 { backgroundColor: colors.card.background, borderColor: colors.border },
               ]}
             >
-              <Text style={[styles.summaryValue, { color: colors.warning }]}>
-                ${summary.unpaid_earnings}
+              <Text style={[styles.summaryValue, { color: colors.warning }]} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.6}>
+                {formatCurrency(summary.unpaid_earnings)}
               </Text>
               <Text style={[styles.summaryLabel, { color: colors.textSecondary }]}>
                 Unpaid
@@ -117,8 +118,8 @@ export default function EarningsHistoryScreen() {
                 { backgroundColor: colors.card.background, borderColor: colors.border },
               ]}
             >
-              <Text style={[styles.summaryValue, { color: colors.secondary }]}>
-                ${summary.paid_earnings}
+              <Text style={[styles.summaryValue, { color: colors.secondary }]} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.6}>
+                {formatCurrency(summary.paid_earnings)}
               </Text>
               <Text style={[styles.summaryLabel, { color: colors.textSecondary }]}>
                 Paid
@@ -143,7 +144,7 @@ export default function EarningsHistoryScreen() {
           >
             <MaterialIcons name="payments" size={16} color={colors.primary} />
             <Text style={[styles.rateText, { color: colors.primary }]}>
-              Current rate: ${summary.current_hourly_rate}/hr
+              Current rate: {formatCurrency(summary.current_hourly_rate)}/hr
             </Text>
           </View>
         </View>
@@ -195,7 +196,7 @@ export default function EarningsHistoryScreen() {
         <View style={styles.metaItem}>
           <MaterialIcons name="hourglass-bottom" size={14} color={colors.textTertiary} />
           <Text style={[styles.metaText, { color: colors.textSecondary }]}>
-            {item.total_hours}h @ ${item.employee_rate}/hr
+            {item.total_hours}h @ {formatCurrency(item.employee_rate)}/hr
           </Text>
         </View>
       </View>
@@ -211,7 +212,7 @@ export default function EarningsHistoryScreen() {
           <View />
         )}
         <Text style={[styles.recordEarning, { color: colors.success }]}>
-          ${item.total_earning}
+          {formatCurrency(item.total_earning)}
         </Text>
       </View>
     </View>
@@ -308,7 +309,7 @@ const styles = StyleSheet.create({
   summaryWrap: { marginBottom: 16 },
   summaryRow: { flexDirection: "row", gap: 10, marginBottom: 10 },
   summaryCard: { flex: 1, borderWidth: 1, borderRadius: 12, padding: 14, alignItems: "flex-start" },
-  summaryValue: { fontSize: 20, fontWeight: "700" },
+  summaryValue: { fontSize: 20, fontWeight: "700", alignSelf: "stretch" },
   summaryLabel: { fontSize: 12, marginTop: 2 },
   rateBanner: {
     flexDirection: "row",

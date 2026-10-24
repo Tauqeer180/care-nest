@@ -14,6 +14,7 @@ import useSWR from "swr";
 import { useTheme } from "@/hooks/useTheme";
 import { fetchEmployees, Employee } from "@/services/jobPoolService";
 import { SWR_KEYS } from "@/services/swrKeys";
+import { formatCurrency } from "@/utils/currency";
 
 interface Props {
   visible: boolean;
@@ -109,7 +110,7 @@ export default function EmployeePickerModal({ visible, onClose, onSelect, submit
                       {item.first_name} {item.last_name}
                     </Text>
                     <Text style={[styles.empMeta, { color: colors.textSecondary }]} numberOfLines={1}>
-                      {item.emp_code} · ${item.hourly_rate}/hr
+                      {item.emp_code} · {formatCurrency(item.hourly_rate)}/hr
                     </Text>
                     <Text style={[styles.empEmail, { color: colors.textTertiary }]} numberOfLines={1}>
                       {item.email}

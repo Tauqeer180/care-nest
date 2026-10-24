@@ -15,6 +15,7 @@ import {
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import useSWR, { mutate as globalMutate } from "swr";
+import { formatCurrency } from "@/utils/currency";
 
 export default function MyJobDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
@@ -241,7 +242,7 @@ export default function MyJobDetailScreen() {
             style={[styles.payChip, { backgroundColor: colors.success + "15" }]}
           >
             <Text style={[styles.payRate, { color: colors.success }]}>
-              ${job.pay_rate ?? job.rate_used ?? 0}/hr
+              {formatCurrency(job.pay_rate ?? job.rate_used)}/hr
             </Text>
           </View>
         </View>
@@ -371,8 +372,11 @@ export default function MyJobDetailScreen() {
                       styles.earningsValue,
                       { color: colors.textPrimary },
                     ]}
+                    numberOfLines={1}
+                    adjustsFontSizeToFit
+                    minimumFontScale={0.7}
                   >
-                    ${rate}
+                    {formatCurrency(rate)}
                   </Text>
                 </View>
                 <View
@@ -392,8 +396,11 @@ export default function MyJobDetailScreen() {
                   </Text>
                   <Text
                     style={[styles.earningsValue, { color: colors.success }]}
+                    numberOfLines={1}
+                    adjustsFontSizeToFit
+                    minimumFontScale={0.7}
                   >
-                    ${Number(estTotal).toFixed(2)}
+                    {formatCurrency(Number(estTotal).toFixed(2))}
                   </Text>
                 </View>
               </View>
@@ -702,7 +709,7 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     marginTop: 8,
   },
-  payRate: { fontSize: 18, fontWeight: "700" },
+  payRate: { fontSize: 16, fontWeight: "700" },
   acceptedHeader: {
     flexDirection: "row",
     alignItems: "center",
@@ -710,7 +717,7 @@ const styles = StyleSheet.create({
     marginBottom: 14,
   },
   earningsRow: { flexDirection: "row", alignItems: "center" },
-  earningsItem: { flex: 1, alignItems: "center" },
+  earningsItem: { flex: 1, alignItems: "center", paddingHorizontal: 4 },
   earningsDivider: { width: 1, height: 36 },
   earningsLabel: {
     fontSize: 11,
